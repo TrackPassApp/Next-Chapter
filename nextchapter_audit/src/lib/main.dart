@@ -63,7 +63,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider.value(value: _profileProvider),
       ],
       child: MaterialApp.router(
-        title: 'ConnectUp',
+        title: 'Next Chapter',
         theme: AppTheme.lightTheme,
         routerConfig: AppRouter.router(_authProvider),
       ),

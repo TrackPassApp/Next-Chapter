@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -30,10 +31,24 @@ class AppRouter {
       final loc = state.matchedLocation;
 
       final isAuthRoute = loc == '/login' || loc == '/signup' || loc == '/forgot-password';
-      final isPublic = loc == '/' || loc == '/privacy' || loc == '/terms' || loc == '/diagnostics' || isAuthRoute;
+      // Note: /diagnostics is intentionally NOT in this public list.
+      // It is restricted below to debug builds or signed-in admins.
+      final isPublic = loc == '/' || loc == '/privacy' || loc == '/terms' || isAuthRoute;
 
-      if (!loggedIn && !isPublic) return '/login';
+      // Standard logged-out gating.
+      if (!loggedIn && !isPublic && loc != '/diagnostics') return '/login';
       if (loggedIn && (loc == '/' || isAuthRoute)) return '/browse';
+
+      // Admin-only gating. Defense-in-depth — AdminScreen also self-guards.
+      if (loc == '/admin' && !authProvider.isAdmin) {
+        return loggedIn ? '/browse' : '/login';
+      }
+
+      // Diagnostics route: debug builds OR signed-in admins only.
+      if (loc == '/diagnostics' && !kDebugMode && !authProvider.isAdmin) {
+        return loggedIn ? '/browse' : '/';
+      }
+
       return null;
     },
     routes: [

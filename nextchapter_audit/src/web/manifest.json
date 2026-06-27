@@ -1,11 +1,11 @@
 {
-    "name": "ConnectUp",
-    "short_name": "ConnectUp",
+    "name": "Next Chapter",
+    "short_name": "Next Chapter",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#ffffff",
-    "description": "A new Flutter project.",
+    "description": "Free, privacy-first dating and friendship for adults 18–100.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

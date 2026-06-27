@@ -1,5 +1,5 @@
-name: primio_app
-description: A Primio-generated Flutter app
+name: next_chapter
+description: Next Chapter — a free, privacy-first dating and friendship platform for adults 18–100.
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -31,12 +31,9 @@ dependencies:
   # Remote database and networking
   http: ^1.4.0
 
-  # --- PRIMIO_ADDITIONS BEGIN (do not edit/remove) ---
-  # PRIMIO_ADDED: supabase_flutter — Supabase Auth, DB, Storage, Realtime
+  # Supabase + media picker (used across auth, profile, storage, realtime)
   supabase_flutter: ^2.8.4
-  # PRIMIO_ADDED: image_picker — profile photo upload from gallery/camera
   image_picker: ^1.1.2
-  # --- PRIMIO_ADDITIONS END ---
 
   # Navigation (fully cross-platform)
   go_router: ^14.1.4

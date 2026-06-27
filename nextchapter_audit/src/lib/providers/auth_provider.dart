@@ -49,12 +49,26 @@ class AuthProvider extends ChangeNotifier {
 
   String? get email => _isMockMode ? _mockEmail : _user?.email;
 
+  /// Server-controlled admin check.
+  ///
+  /// Reads `app_metadata.role` from the Supabase JWT. `app_metadata` is
+  /// writable ONLY by the service role (i.e. Supabase dashboard or a server
+  /// using the service key) — never by the user themselves. This closes the
+  /// privilege-escalation hole present in the previous implementation, which
+  /// read from `user_metadata` (user-writable) and also hard-coded an email.
+  ///
+  /// To grant admin to a user, run in the Supabase SQL editor:
+  ///   UPDATE auth.users
+  ///   SET raw_app_meta_data =
+  ///     COALESCE(raw_app_meta_data, '{}'::jsonb) || '{"role":"admin"}'::jsonb
+  ///   WHERE email = '<their email>';
+  /// Then have the user sign out and sign back in so the JWT is reissued.
   bool get isAdmin {
     if (_isMockMode) return _mockIsAdmin;
-    // Admin flag is stored in user_metadata set during signup or via the
-    // Supabase dashboard. Falls back to false for regular users.
-    return _user?.userMetadata?['is_admin'] == true ||
-        _user?.email == 'admin@nextchapter.com';
+    final role = _user?.appMetadata['role'];
+    return role == 'admin' ||
+        role == 'super_admin' ||
+        role == 'moderator';
   }
 
   bool get isEmailVerified {

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/mock_data_service.dart';
 import '../theme/theme.dart';
 
@@ -13,6 +16,41 @@ class AdminScreen extends StatelessWidget {
     final appColors = theme.extension<AppColorsExtension>()!;
     final width = MediaQuery.sizeOf(context).width;
     final isMobile = width < 600;
+
+    // Defense-in-depth admin guard. The router also blocks /admin for
+    // non-admins, but if anything ever bypasses that (deep link, tests,
+    // future refactor), this screen still refuses to render.
+    final auth = context.watch<AuthProvider>();
+    if (!auth.isAdmin) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Forbidden')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppTheme.spacingLg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock_outline, size: 48, color: appColors.danger),
+                const SizedBox(height: AppTheme.spacingMd),
+                Text('Admin access required.',
+                    style: text.titleMedium, textAlign: TextAlign.center),
+                const SizedBox(height: AppTheme.spacingSm),
+                Text(
+                  'This screen is restricted to platform administrators.',
+                  style: text.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppTheme.spacingLg),
+                ElevatedButton(
+                  onPressed: () => context.go(auth.isLoggedIn ? '/browse' : '/'),
+                  child: const Text('Go back'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
