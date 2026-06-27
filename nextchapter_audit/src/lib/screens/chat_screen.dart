@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/conversation.dart';
 import '../providers/messages_provider.dart';
 import '../providers/profile_provider.dart';
 import '../theme/theme.dart';
 import '../widgets/chat/message_bubble.dart';
 import '../widgets/chat/chat_input.dart';
+import '../widgets/common/verification_badges.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -58,12 +60,40 @@ class _ChatScreenState extends State<ChatScreen> {
     final messages = context.watch<MessagesProvider>();
     final myProfileId = messages.myProfileId;
 
+    // Resolve the other participant from the conversation list (already cached).
+    Conversation? activeConv;
+    try {
+      activeConv = messages.conversations.firstWhere((c) => c.id == widget.conversationId);
+    } catch (_) {
+      activeConv = null;
+    }
+
     // Auto-scroll on new message ticks.
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Conversation', style: text.titleMedium),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                activeConv?.otherUserName ?? 'Conversation',
+                overflow: TextOverflow.ellipsis,
+                style: text.titleMedium,
+              ),
+            ),
+            if (activeConv != null) ...[
+              const SizedBox(width: 6),
+              VerificationBadges(
+                email: activeConv.otherEmailVerified,
+                phone: activeConv.otherPhoneVerified,
+                selfie: activeConv.otherSelfieVerified,
+                id: activeConv.otherIdVerified,
+              ),
+            ],
+          ],
+        ),
         centerTitle: true,
       ),
       body: Center(

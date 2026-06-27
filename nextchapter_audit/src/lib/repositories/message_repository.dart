@@ -94,6 +94,14 @@ class MessageRepository {
           ? (photoRows.first['display_url'] as String?) ?? ''
           : '';
 
+      // Other participant's verification flags (one tiny read per row).
+      final verRows = await db
+          .from('verification_status')
+          .select('email_verified, phone_verified, selfie_verified, id_verified')
+          .eq('profile_id', otherProfileId)
+          .maybeSingle();
+      final ver = verRows == null ? const <String, dynamic>{} : Map<String, dynamic>.from(verRows);
+
       // Most recent non-deleted message.
       final msgRows = await db
           .from('messages')
@@ -131,6 +139,10 @@ class MessageRepository {
         unreadCount: unreadCount,
         isRequest: convRow['is_request'] as bool? ?? false,
         isOnline: otherProfileRow['is_online'] as bool? ?? false,
+        otherEmailVerified:  ver['email_verified']  == true,
+        otherPhoneVerified:  ver['phone_verified']  == true,
+        otherSelfieVerified: ver['selfie_verified'] == true,
+        otherIdVerified:     ver['id_verified']     == true,
       ));
     }
 

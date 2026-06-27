@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/user_profile.dart';
 import '../../theme/theme.dart';
+import 'verification_badges.dart';
 
 class ProfileCard extends StatelessWidget {
   final UserProfile profile;
@@ -67,20 +68,11 @@ class ProfileCard extends StatelessWidget {
                     Positioned(
                       top: AppTheme.spacingSm,
                       left: AppTheme.spacingSm,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: appColors.verified,
-                          borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.verified, size: AppTheme.iconSm - 2, color: colors.onPrimary),
-                            const SizedBox(width: 2),
-                            Text('Verified', style: text.labelSmall?.copyWith(color: colors.onPrimary, fontSize: 10)),
-                          ],
-                        ),
+                      child: VerificationBadges(
+                        email: profile.emailVerified,
+                        phone: profile.phoneVerified,
+                        selfie: profile.selfieVerified,
+                        id: profile.idVerified,
                       ),
                     ),
                 ],

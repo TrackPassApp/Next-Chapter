@@ -8,6 +8,12 @@ class Conversation {
   final int unreadCount;
   final bool isRequest;
   final bool isOnline;
+  // Verification flags for the OTHER participant — drives badges in the
+  // conversation list and chat header without an extra round-trip.
+  final bool otherEmailVerified;
+  final bool otherPhoneVerified;
+  final bool otherSelfieVerified;
+  final bool otherIdVerified;
 
   const Conversation({
     required this.id,
@@ -19,6 +25,10 @@ class Conversation {
     this.unreadCount = 0,
     this.isRequest = false,
     this.isOnline = false,
+    this.otherEmailVerified = false,
+    this.otherPhoneVerified = false,
+    this.otherSelfieVerified = false,
+    this.otherIdVerified = false,
   });
 
   Conversation copyWith({
@@ -38,6 +48,10 @@ class Conversation {
       unreadCount: unreadCount ?? this.unreadCount,
       isRequest: isRequest ?? this.isRequest,
       isOnline: isOnline ?? this.isOnline,
+      otherEmailVerified: otherEmailVerified,
+      otherPhoneVerified: otherPhoneVerified,
+      otherSelfieVerified: otherSelfieVerified,
+      otherIdVerified: otherIdVerified,
     );
   }
 }

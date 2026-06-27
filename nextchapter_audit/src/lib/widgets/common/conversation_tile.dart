@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/conversation.dart';
 import '../../theme/theme.dart';
+import 'verification_badges.dart';
 
 class ConversationTile extends StatelessWidget {
   final Conversation conversation;
@@ -58,11 +59,26 @@ class ConversationTile extends StatelessWidget {
               ),
           ],
         ),
-        title: Text(
-          conversation.otherUserName,
-          style: text.titleSmall?.copyWith(
-            fontWeight: conversation.unreadCount > 0 ? FontWeight.w700 : FontWeight.w500,
-          ),
+        title: Row(
+          children: [
+            Flexible(
+              child: Text(
+                conversation.otherUserName,
+                overflow: TextOverflow.ellipsis,
+                style: text.titleSmall?.copyWith(
+                  fontWeight: conversation.unreadCount > 0 ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            VerificationBadges(
+              email: conversation.otherEmailVerified,
+              phone: conversation.otherPhoneVerified,
+              selfie: conversation.otherSelfieVerified,
+              id: conversation.otherIdVerified,
+              scale: 0.9,
+            ),
+          ],
         ),
         subtitle: Text(
           conversation.lastMessage,

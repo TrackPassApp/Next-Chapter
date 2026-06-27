@@ -35,7 +35,7 @@ class SettingsScreen extends StatelessWidget {
                     context.go('/edit-profile');
                   }),
                   _SettingsTile(icon: Icons.verified_user_outlined, title: 'Verification Status', onTap: () {
-                    _showVerificationStatus(context, text, colors, appColors);
+                    context.push('/verification');
                   }),
                   _SettingsTile(icon: Icons.block_outlined, title: 'Blocked Users', onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No blocked users')));
@@ -84,60 +84,10 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _showVerificationStatus(BuildContext context, TextTheme text, ColorScheme colors, AppColorsExtension appColors) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Verification Status', style: text.titleLarge),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _VerRow(label: 'Email', verified: true, text: text, appColors: appColors),
-            _VerRow(label: 'Phone', verified: false, text: text, appColors: appColors),
-            _VerRow(label: 'Selfie', verified: false, text: text, appColors: appColors),
-            _VerRow(label: 'Government ID', verified: false, text: text, appColors: appColors),
-            const SizedBox(height: AppTheme.spacingMd),
-            Text('Verification is free and helps keep the community safe.', style: text.bodySmall, textAlign: TextAlign.center),
-          ],
-        ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
-      ),
-    );
-  }
-
   void _showDeleteDialog(BuildContext context, ColorScheme colors, TextTheme text, AppColorsExtension appColors) {
     showDialog(
       context: context,
       builder: (_) => _DeleteAccountDialog(colors: colors, text: text, appColors: appColors),
-    );
-  }
-}
-
-class _VerRow extends StatelessWidget {
-  final String label;
-  final bool verified;
-  final TextTheme text;
-  final AppColorsExtension appColors;
-
-  const _VerRow({required this.label, required this.verified, required this.text, required this.appColors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingSm),
-      child: Row(
-        children: [
-          Icon(
-            verified ? Icons.check_circle : Icons.radio_button_unchecked,
-            color: verified ? appColors.success : appColors.subtleText,
-            size: AppTheme.iconMd,
-          ),
-          const SizedBox(width: AppTheme.spacingMd),
-          Text(label, style: text.bodyMedium),
-          const Spacer(),
-          Text(verified ? 'Verified' : 'Not verified', style: text.labelSmall?.copyWith(color: verified ? appColors.success : appColors.subtleText)),
-        ],
-      ),
     );
   }
 }

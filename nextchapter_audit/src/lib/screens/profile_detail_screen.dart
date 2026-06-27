@@ -12,6 +12,7 @@ import '../services/supabase_service.dart';
 import '../theme/theme.dart';
 import '../widgets/common/completeness_ring.dart';
 import '../widgets/common/report_dialog.dart';
+import '../widgets/common/verification_badges.dart';
 
 class ProfileDetailScreen extends StatefulWidget {
   final String profileId;
@@ -188,7 +189,13 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
                         ),
                         if (profile.hasAnyVerification) ...[
                           const SizedBox(height: AppTheme.spacingSm),
-                          _VerificationBadges(profile: profile, text: text, appColors: appColors),
+                          VerificationBadges(
+                            email: profile.emailVerified,
+                            phone: profile.phoneVerified,
+                            selfie: profile.selfieVerified,
+                            id: profile.idVerified,
+                            expanded: true,
+                          ),
                         ],
                       ],
                     ),
@@ -588,46 +595,6 @@ class _PromptCard extends StatelessWidget {
           Text(prompt.promptKey, style: text.labelMedium?.copyWith(color: colors.primary, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           Text(prompt.answer, style: text.bodyLarge?.copyWith(height: 1.4)),
-        ],
-      ),
-    );
-  }
-}
-
-class _VerificationBadges extends StatelessWidget {
-  final UserProfile profile;
-  final TextTheme text;
-  final AppColorsExtension appColors;
-
-  const _VerificationBadges({required this.profile, required this.text, required this.appColors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppTheme.spacingSm,
-      children: [
-        if (profile.emailVerified) _badge('Email', appColors.verified),
-        if (profile.phoneVerified) _badge('Phone', appColors.verified),
-        if (profile.selfieVerified) _badge('Selfie', appColors.verified),
-        if (profile.idVerified) _badge('ID', appColors.success),
-      ],
-    );
-  }
-
-  Widget _badge(String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-        border: Border.all(color: color.withOpacity(0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.verified, size: 12, color: color),
-          const SizedBox(width: 3),
-          Text(label, style: text.labelSmall?.copyWith(color: Colors.white, fontSize: 10)),
         ],
       ),
     );

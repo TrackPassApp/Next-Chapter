@@ -19,6 +19,7 @@ import '../screens/admin_screen.dart';
 import '../screens/privacy_screen.dart';
 import '../screens/terms_screen.dart';
 import '../screens/app_shell.dart';
+import '../screens/verification_status_screen.dart';
 import '../screens/diagnostics_screen.dart';
 
 class AppRouter {
@@ -82,6 +83,7 @@ class AppRouter {
       GoRoute(path: '/admin', builder: (_, __) => const AdminScreen()),
       GoRoute(path: '/welcome', builder: (_, __) => const OnboardingScreen()),
       GoRoute(path: '/diagnostics', builder: (_, __) => const DiagnosticsScreen()),
+      GoRoute(path: '/verification', builder: (_, __) => const VerificationStatusScreen()),
       GoRoute(path: '/edit-profile', builder: (_, __) => const EditProfileScreen()),
       GoRoute(
         path: '/profile/:id',

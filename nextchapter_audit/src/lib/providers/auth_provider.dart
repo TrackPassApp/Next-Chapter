@@ -191,6 +191,23 @@ class AuthProvider extends ChangeNotifier {
     // _user is cleared automatically by the onAuthStateChange listener.
   }
 
+  /// Re-send the Supabase email verification link to the current user.
+  /// Returns true on success.
+  Future<bool> resendEmailVerification() async {
+    final email = _user?.email;
+    if (_isMockMode || email == null || email.isEmpty) return false;
+    try {
+      await SupabaseService.db.auth.resend(
+        type: OtpType.signup,
+        email: email,
+        emailRedirectTo: AppConfig.appUrl.isEmpty ? null : AppConfig.appUrl,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ─── Mock fallbacks ───────────────────────────────────────────────────────
 
   Future<AuthResult> _mockLogin(String email, String password) async {
