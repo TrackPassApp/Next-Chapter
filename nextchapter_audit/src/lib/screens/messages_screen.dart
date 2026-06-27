@@ -5,6 +5,7 @@ import '../providers/messages_provider.dart';
 import '../providers/profile_provider.dart';
 import '../theme/theme.dart';
 import '../widgets/common/conversation_tile.dart';
+import '../widgets/common/my_avatar_leading.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
@@ -35,6 +36,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const MyAvatarLeading(),
+        leadingWidth: 64,
         title: const Text('Messages'),
         actions: [
           Padding(

@@ -3,11 +3,13 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
+import '../providers/block_provider.dart';
 import '../providers/browse_provider.dart';
 import '../theme/theme.dart';
 import '../widgets/common/profile_card.dart';
 import '../widgets/common/filter_sheet.dart';
 import '../widgets/common/ad_placeholder.dart';
+import '../widgets/common/my_avatar_leading.dart';
 
 class BrowseScreen extends StatefulWidget {
   const BrowseScreen({super.key});
@@ -18,15 +20,24 @@ class BrowseScreen extends StatefulWidget {
 
 class _BrowseScreenState extends State<BrowseScreen> {
   final _searchController = TextEditingController();
+  Set<String> _lastBlockedSnapshot = const {};
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final userId = context.read<AuthProvider>().userId;
-      // Block list will be populated in Batch B6 once the user_blocks table lands.
-      context.read<BrowseProvider>().loadProfiles(currentUserId: userId);
+      _reloadWithBlocks();
     });
+  }
+
+  void _reloadWithBlocks() {
+    final userId = context.read<AuthProvider>().userId;
+    final blocked = context.read<BlockProvider>().blockedIds;
+    _lastBlockedSnapshot = blocked;
+    context.read<BrowseProvider>().loadProfiles(
+          currentUserId: userId,
+          blockedProfileIds: blocked,
+        );
   }
 
   @override
@@ -56,6 +67,14 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final text = theme.textTheme;
     final appColors = theme.extension<AppColorsExtension>()!;
     final provider = context.watch<BrowseProvider>();
+    // React when the user blocks/unblocks somebody elsewhere in the app.
+    final currentBlocks = context.watch<BlockProvider>().blockedIds;
+    if (currentBlocks.length != _lastBlockedSnapshot.length ||
+        !currentBlocks.containsAll(_lastBlockedSnapshot)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _reloadWithBlocks();
+      });
+    }
     final width = MediaQuery.sizeOf(context).width;
     final isMobile = width < 600;
 
@@ -70,6 +89,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const MyAvatarLeading(),
+        leadingWidth: 64,
         title: const Text('Browse Profiles'),
         actions: [
           if (provider.hasActiveFilters)
@@ -203,10 +224,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                               Text(provider.error!, style: text.bodyMedium, textAlign: TextAlign.center),
                               const SizedBox(height: AppTheme.spacingMd),
                               ElevatedButton(
-                                onPressed: () {
-                                  final userId = context.read<AuthProvider>().userId;
-                                  provider.loadProfiles(currentUserId: userId);
-                                },
+                                onPressed: _reloadWithBlocks,
                                 child: const Text('Retry'),
                               ),
                             ],
@@ -228,8 +246,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                           )
                         : RefreshIndicator(
                             onRefresh: () async {
-                              final userId = context.read<AuthProvider>().userId;
-                              await provider.loadProfiles(currentUserId: userId);
+                              _reloadWithBlocks();
                             },
                             child: CustomScrollView(
                               slivers: [

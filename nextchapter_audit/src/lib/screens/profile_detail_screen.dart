@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
+import '../providers/block_provider.dart';
 import '../providers/messages_provider.dart';
 import '../providers/profile_provider.dart';
 import '../repositories/profile_repository.dart';
@@ -204,13 +205,25 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
                     ),
                   ]
                 : [
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert),
-                      onSelected: (value) => _onMenu(value, profile, appColors, colors),
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'report', child: Row(children: [Icon(Icons.flag_outlined, size: 20), SizedBox(width: 8), Text('Report')])),
-                        PopupMenuItem(value: 'block', child: Row(children: [Icon(Icons.block, size: 20), SizedBox(width: 8), Text('Block')])),
-                      ],
+                    Consumer<BlockProvider>(
+                      builder: (_, blockProvider, __) {
+                        final blocked = blockProvider.hasBlocked(profile.id);
+                        return PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert),
+                          onSelected: (value) => _onMenu(value, profile, appColors, colors, blocked: blocked),
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(value: 'report', child: Row(children: [Icon(Icons.flag_outlined, size: 20), SizedBox(width: 8), Text('Report')])),
+                            PopupMenuItem(
+                              value: blocked ? 'unblock' : 'block',
+                              child: Row(children: [
+                                Icon(blocked ? Icons.lock_open : Icons.block, size: 20),
+                                const SizedBox(width: 8),
+                                Text(blocked ? 'Unblock' : 'Block'),
+                              ]),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
           ),
@@ -379,23 +392,46 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: isOwn
-          ? null
-          : SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(AppTheme.spacingMd),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 700),
-                    child: ElevatedButton.icon(
-                      onPressed: () => _openConversation(profile),
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: Text('Message ${profile.firstName} — Free'),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppTheme.spacingMd),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 700),
+              child: isOwn
+                  ? ElevatedButton.icon(
+                      onPressed: () {
+                        // Incomplete own profile → onboarding wizard; complete → editor.
+                        if (!profile.isComplete) {
+                          context.go('/welcome');
+                        } else {
+                          context.push('/edit-profile').then((_) => _load());
+                        }
+                      },
+                      icon: const Icon(Icons.edit_outlined),
+                      label: Text(profile.isComplete ? 'Edit Profile' : 'Complete Profile'),
+                    )
+                  : Consumer<BlockProvider>(
+                      builder: (_, blockProvider, __) {
+                        final blocked = blockProvider.hasBlocked(profile.id);
+                        if (blocked) {
+                          return OutlinedButton.icon(
+                            onPressed: () => _confirmUnblock(profile),
+                            icon: const Icon(Icons.lock_open),
+                            label: Text('Unblock ${profile.firstName} to message'),
+                          );
+                        }
+                        return ElevatedButton.icon(
+                          onPressed: () => _openConversation(profile),
+                          icon: const Icon(Icons.chat_bubble_outline),
+                          label: Text('Message ${profile.firstName} — Free'),
+                        );
+                      },
                     ),
-                  ),
-                ),
-              ),
             ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -413,7 +449,6 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
       await messages.bindProfile(myProfileId);
     }
 
-    // Use first selected mode as the conversation's mode (defaults to 'date').
     final mode = profile.modes.isNotEmpty ? profile.modes.first : 'date';
     final convId = await messages.startConversationWith(profile.id, mode: mode);
 
@@ -427,11 +462,34 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
     context.go('/messages/$convId');
   }
 
-  void _onMenu(String value, UserProfile profile, AppColorsExtension appColors, ColorScheme colors) {
+  Future<void> _confirmUnblock(UserProfile profile) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Unblock ${profile.firstName}?'),
+        content: const Text('They will be able to message you and see you in browse again.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Unblock')),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final ok = await context.read<BlockProvider>().unblockUser(profile.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? '${profile.firstName} unblocked' : 'Could not unblock. Try again.')),
+    );
+  }
+
+  void _onMenu(String value, UserProfile profile, AppColorsExtension appColors, ColorScheme colors, {required bool blocked}) {
     if (value == 'report') {
       showDialog(
         context: context,
-        builder: (_) => ReportDialog(userName: profile.firstName),
+        builder: (_) => ReportDialog(
+          userName: profile.firstName,
+          reportedProfileId: profile.id,
+        ),
       ).then((result) {
         if (result != null && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -444,17 +502,14 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
         context: context,
         builder: (_) => AlertDialog(
           title: Text('Block ${profile.firstName}?'),
-          content: const Text('They will not be able to message or view your profile.'),
+          content: const Text(
+            'They will no longer be able to message or see your profile. '
+            'Any existing conversation will be hidden from both of you.',
+          ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${profile.firstName} has been blocked')),
-                );
-                context.pop();
-              },
+              onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: appColors.danger,
                 foregroundColor: colors.onError,
@@ -464,7 +519,29 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
             ),
           ],
         ),
-      );
+      ).then((confirm) async {
+        if (confirm != true || !mounted) return;
+        final messages = context.read<MessagesProvider>();
+        // Close any open conversation with this person so we don't sit on a now-RLS-hidden row.
+        await messages.closeActiveConversation();
+        final ok = await context.read<BlockProvider>().blockUser(profile.id);
+        if (!mounted) return;
+        if (ok) {
+          // Refresh inbox so the blocked conversation disappears.
+          await messages.loadConversations();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${profile.firstName} has been blocked')),
+          );
+          context.pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not block. Please try again.')),
+          );
+        }
+      });
+    } else if (value == 'unblock') {
+      _confirmUnblock(profile);
     }
   }
 }

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
 import '../theme/theme.dart';
+import '../widgets/common/my_avatar_leading.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -16,7 +17,11 @@ class SettingsScreen extends StatelessWidget {
     final appColors = theme.extension<AppColorsExtension>()!;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        leading: const MyAvatarLeading(),
+        leadingWidth: 64,
+        title: const Text('Settings'),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
