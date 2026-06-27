@@ -1,3 +1,10 @@
+class PromptAnswer {
+  final String promptKey;
+  final String answer;
+  final int position;
+  const PromptAnswer({required this.promptKey, required this.answer, this.position = 0});
+}
+
 class UserProfile {
   final String id;
   final String firstName;
@@ -12,6 +19,7 @@ class UserProfile {
   final List<String> interests;
   final List<String> lifeSituation;
   final List<String> modes;
+  final List<PromptAnswer> prompts;
   final bool isComplete;
   final int completenessScore;
   final bool emailVerified;
@@ -36,6 +44,7 @@ class UserProfile {
     required this.interests,
     required this.lifeSituation,
     this.modes = const ['date'],
+    this.prompts = const [],
     this.isComplete = false,
     this.completenessScore = 0,
     this.emailVerified = false,

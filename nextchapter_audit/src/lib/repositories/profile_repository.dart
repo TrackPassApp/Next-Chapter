@@ -161,6 +161,21 @@ class ProfileRepository {
     );
   }
 
+  /// Replace all Hinge-style prompts for a profile. Caps at 3.
+  Future<void> savePrompts(String profileId, List<PromptAnswer> prompts) async {
+    final db = SupabaseService.client;
+    if (db == null) return;
+    await db.from('profile_prompts').delete().eq('profile_id', profileId);
+    if (prompts.isEmpty) return;
+    final rows = prompts.take(3).toList().asMap().entries.map((e) => {
+          'profile_id': profileId,
+          'prompt_key': e.value.promptKey,
+          'answer': e.value.answer,
+          'position': e.key,
+        }).toList();
+    await db.from('profile_prompts').insert(rows);
+  }
+
   /// Ensure a verification_status row exists for the profile.
   Future<void> ensureVerificationStatus(String profileId, {bool emailVerified = false}) async {
     final db = SupabaseService.client;
@@ -218,12 +233,18 @@ class ProfileRepository {
         .eq('profile_id', profileId)
         .maybeSingle()
         .then((r) => r as Map<String, dynamic>?);
+    final promptsFuture = db.from('profile_prompts')
+        .select()
+        .eq('profile_id', profileId)
+        .order('position')
+        .then((r) => r as List);
 
     final photos      = await photosFuture;
     final interests   = await interestsFuture;
     final lookingFor  = await lookingForFuture;
     final lifeSit     = await lifeSitFuture;
     final verRow      = await verFuture;
+    final promptsRows = await promptsFuture;
 
     final dobRaw = row['date_of_birth'];
     final dob = dobRaw != null
@@ -244,6 +265,11 @@ class ProfileRepository {
       lookingFor: lookingFor.map((l) => l['looking_for'] as String).toList(),
       lifeSituation: lifeSit.map((s) => s['life_situation'] as String).toList(),
       modes: (row['modes'] as List?)?.map((m) => m.toString()).toList() ?? const ['date'],
+      prompts: promptsRows.map<PromptAnswer>((r) => PromptAnswer(
+        promptKey: r['prompt_key'] as String,
+        answer: r['answer'] as String,
+        position: (r['position'] as num?)?.toInt() ?? 0,
+      )).toList(),
       isComplete: row['is_complete'] as bool? ?? false,
       completenessScore: (row['completeness_score'] as num?)?.toInt() ?? 0,
       emailVerified: verRow?['email_verified'] as bool? ?? false,
