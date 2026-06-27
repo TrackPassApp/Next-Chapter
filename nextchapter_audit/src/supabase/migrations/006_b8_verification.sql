@@ -28,8 +28,8 @@ create table if not exists public.verification_requests (
   profile_id    uuid not null references public.profiles(id) on delete cascade,
   kind          text not null check (kind in ('phone','selfie','id')),
   status        text not null default 'pending' check (status in ('pending','approved','rejected','cancelled')),
-  phone_number  text,                          -- only set when kind='phone'
-  storage_path  text,                          -- only set when kind in ('selfie','id')
+  phone_number  text,
+  storage_path  text,
   submitted_at  timestamptz not null default now(),
   reviewed_at   timestamptz,
   reviewed_by   uuid references auth.users(id),
@@ -41,13 +41,11 @@ create index if not exists verification_requests_status_idx  on public.verificat
 
 alter table public.verification_requests enable row level security;
 
--- Owner SELECT.
 drop policy if exists "vreq_owner_select" on public.verification_requests;
 create policy "vreq_owner_select"
   on public.verification_requests for select to authenticated
   using (profile_id = public.my_profile_id());
 
--- Owner INSERT (only their own pending row).
 drop policy if exists "vreq_owner_insert" on public.verification_requests;
 create policy "vreq_owner_insert"
   on public.verification_requests for insert to authenticated
@@ -56,20 +54,17 @@ create policy "vreq_owner_insert"
     and status = 'pending'
   );
 
--- Owner UPDATE — restricted to cancelling their OWN pending request.
 drop policy if exists "vreq_owner_update" on public.verification_requests;
 create policy "vreq_owner_update"
   on public.verification_requests for update to authenticated
   using (profile_id = public.my_profile_id() and status = 'pending')
   with check (status in ('pending','cancelled'));
 
--- Admin SELECT all.
 drop policy if exists "vreq_admin_select" on public.verification_requests;
 create policy "vreq_admin_select"
   on public.verification_requests for select to authenticated
   using (public.is_admin());
 
--- Admin UPDATE all (status, reviewed_at, reviewed_by, admin_notes).
 drop policy if exists "vreq_admin_update" on public.verification_requests;
 create policy "vreq_admin_update"
   on public.verification_requests for update to authenticated
@@ -101,7 +96,6 @@ begin
     raise exception 'A document path is required for % verification', kind;
   end if;
 
-  -- Cancel any previous pending request of the same kind to keep one active.
   update public.verification_requests
      set status = 'cancelled', reviewed_at = now()
    where profile_id = me and kind = submit_verification_request.kind and status = 'pending';
@@ -143,7 +137,6 @@ begin
    where id = request_id;
 
   if approve then
-    -- Flip the corresponding flag in verification_status.
     perform public.admin_set_verification(req.profile_id, req.kind, true, notes);
   end if;
 
@@ -166,7 +159,6 @@ begin
   end if;
 end$$;
 
--- Users INSERT into folder named after their auth.uid().
 drop policy if exists "verif_docs_insert_own" on storage.objects;
 create policy "verif_docs_insert_own"
   on storage.objects for insert to authenticated
@@ -175,7 +167,6 @@ create policy "verif_docs_insert_own"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
--- Users SELECT their own.
 drop policy if exists "verif_docs_select_own" on storage.objects;
 create policy "verif_docs_select_own"
   on storage.objects for select to authenticated
@@ -184,7 +175,6 @@ create policy "verif_docs_select_own"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
--- Admin SELECT all.
 drop policy if exists "verif_docs_select_admin" on storage.objects;
 create policy "verif_docs_select_admin"
   on storage.objects for select to authenticated
@@ -192,7 +182,6 @@ create policy "verif_docs_select_admin"
     bucket_id = 'verification-docs' and public.is_admin()
   );
 
--- Users DELETE their own (lets them cancel/replace).
 drop policy if exists "verif_docs_delete_own" on storage.objects;
 create policy "verif_docs_delete_own"
   on storage.objects for delete to authenticated
