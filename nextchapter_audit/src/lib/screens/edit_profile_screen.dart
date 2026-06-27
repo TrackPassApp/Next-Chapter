@@ -1,0 +1,766 @@
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import '../models/user_profile.dart';
+import '../providers/auth_provider.dart';
+import '../providers/profile_provider.dart';
+import '../services/supabase_service.dart';
+import '../theme/theme.dart';
+
+class EditProfileScreen extends StatefulWidget {
+  const EditProfileScreen({super.key});
+
+  @override
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
+}
+
+class _EditProfileScreenState extends State<EditProfileScreen> {
+  final _formKey = GlobalKey<FormState>();
+
+  final _firstNameCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
+  final _aboutMeCtrl = TextEditingController();
+
+  String? _selectedState;
+  String? _selectedGender;
+  String? _selectedRelationshipStatus;
+  DateTime? _dateOfBirth;
+
+  final List<String> _selectedLookingFor = [];
+  final List<String> _selectedInterests = [];
+  final List<String> _selectedLifeSituation = [];
+
+  bool _saving = false;
+  bool _uploadingPhoto = false;
+  String? _errorMessage;
+
+  static const List<String> _genderOptions = [
+    'Male', 'Female', 'Non-binary', 'Prefer not to say',
+  ];
+  static const List<String> _relationshipOptions = [
+    'Single', 'Divorced', 'Widowed', 'Separated', 'It\'s complicated',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _prefillFromExistingProfile();
+  }
+
+  void _prefillFromExistingProfile() {
+    final profile = context.read<ProfileProvider>().profile;
+    if (profile == null) return;
+
+    _firstNameCtrl.text = profile.firstName;
+    _cityCtrl.text = profile.city;
+    _aboutMeCtrl.text = profile.aboutMe;
+    _selectedState = profile.state.isEmpty ? null : profile.state;
+    _selectedGender = profile.gender.isEmpty ? null : profile.gender;
+    _selectedRelationshipStatus = profile.relationshipStatus.isEmpty ? null : profile.relationshipStatus;
+    _dateOfBirth = profile.dateOfBirth.year > 1900 ? profile.dateOfBirth : null;
+    _selectedLookingFor.addAll(profile.lookingFor);
+    _selectedInterests.addAll(profile.interests);
+    _selectedLifeSituation.addAll(profile.lifeSituation);
+  }
+
+  @override
+  void dispose() {
+    _firstNameCtrl.dispose();
+    _cityCtrl.dispose();
+    _aboutMeCtrl.dispose();
+    super.dispose();
+  }
+
+  // ─── Save ─────────────────────────────────────────────────────────────────
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_dateOfBirth == null) {
+      setState(() => _errorMessage = 'Please enter your date of birth.');
+      return;
+    }
+    if (_selectedState == null) {
+      setState(() => _errorMessage = 'Please select your state.');
+      return;
+    }
+    if (_selectedGender == null) {
+      setState(() => _errorMessage = 'Please select your gender.');
+      return;
+    }
+
+    setState(() { _saving = true; _errorMessage = null; });
+
+    final auth = context.read<AuthProvider>();
+    final profileProvider = context.read<ProfileProvider>();
+
+    // Hard-fail if Supabase is not connected — never silently save in mock mode.
+    if (!SupabaseService.isConfigured || SupabaseService.client == null) {
+      setState(() {
+        _saving = false;
+        _errorMessage =
+            'Cannot save — Supabase is not connected.\n'
+            'Reason: ${SupabaseService.configurationError ?? SupabaseService.initError ?? "Unknown error"}\n'
+            'Fix lib/config/app_config.dart and rebuild.';
+      });
+      return;
+    }
+
+    final userId = auth.userId;
+    if (userId == null) {
+      setState(() { _saving = false; _errorMessage = 'Not logged in.'; });
+      return;
+    }
+
+    final success = await profileProvider.saveProfile(
+      userId: userId,
+      firstName: _firstNameCtrl.text.trim(),
+      dateOfBirth: _dateOfBirth!,
+      city: _cityCtrl.text.trim(),
+      state: _selectedState!,
+      gender: _selectedGender!,
+      relationshipStatus: _selectedRelationshipStatus ?? '',
+      aboutMe: _aboutMeCtrl.text.trim(),
+      lookingFor: List.from(_selectedLookingFor),
+      interests: List.from(_selectedInterests),
+      lifeSituation: List.from(_selectedLifeSituation),
+      isEmailVerified: auth.isEmailVerified,
+    );
+
+    setState(() => _saving = false);
+
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile saved successfully!')),
+      );
+      context.pop();
+    } else {
+      setState(() => _errorMessage = profileProvider.error ?? 'Save failed. Please try again.');
+    }
+  }
+
+  // ─── Photo upload ─────────────────────────────────────────────────────────
+
+  Future<void> _pickAndUploadPhoto() async {
+    final auth = context.read<AuthProvider>();
+    final profileProvider = context.read<ProfileProvider>();
+
+    if (profileProvider.profileId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Save your profile first before uploading photos.')),
+      );
+      return;
+    }
+
+    Uint8List? bytes;
+    String mimeType = 'image/jpeg';
+
+    if (kIsWeb) {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+      if (file == null) return;
+      bytes = await file.readAsBytes();
+      mimeType = file.mimeType ?? 'image/jpeg';
+    } else {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+      if (file == null) return;
+      bytes = await file.readAsBytes();
+      mimeType = file.mimeType ?? 'image/jpeg';
+    }
+
+    setState(() => _uploadingPhoto = true);
+
+    final success = await profileProvider.uploadPhoto(
+      userId: auth.userId!,
+      bytes: bytes,
+      mimeType: mimeType,
+    );
+
+    setState(() => _uploadingPhoto = false);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(success ? 'Photo uploaded!' : 'Upload failed. Please try again.')),
+      );
+    }
+  }
+
+  Future<void> _deletePhoto(String photoId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Photo?'),
+        content: const Text('This photo will be permanently removed.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete', style: TextStyle(color: Theme.of(context).extension<AppColorsExtension>()!.danger)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    await context.read<ProfileProvider>().deletePhoto(photoId);
+  }
+
+  // ─── Build ────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final text = theme.textTheme;
+    final appColors = theme.extension<AppColorsExtension>()!;
+    final profileProvider = context.watch<ProfileProvider>();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(profileProvider.hasProfile ? 'Edit Profile' : 'Create Profile'),
+        actions: [
+          if (_saving)
+            const Padding(
+              padding: EdgeInsets.only(right: AppTheme.spacingMd),
+              child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+            )
+          else
+            TextButton(
+              onPressed: _save,
+              child: Text('Save', style: text.labelLarge?.copyWith(color: colors.primary, fontWeight: FontWeight.w700)),
+            ),
+        ],
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 700),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(AppTheme.spacingMd),
+              children: [
+                  // ── Supabase diagnostics panel ────────────────────────────
+                _SupabaseDiagnosticsPanel(
+                  auth: context.watch<AuthProvider>(),
+                  profileProvider: profileProvider,
+                  colors: colors,
+                  text: text,
+                  appColors: appColors,
+                ),
+                const SizedBox(height: AppTheme.spacingMd),
+
+                if (_errorMessage != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(AppTheme.spacingMd),
+                    decoration: BoxDecoration(
+                      color: appColors.danger.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                      border: Border.all(color: appColors.danger.withOpacity(0.3)),
+                    ),
+                    child: Text(_errorMessage!, style: text.bodySmall?.copyWith(color: appColors.danger)),
+                  ),
+                  const SizedBox(height: AppTheme.spacingMd),
+                ],
+
+                // ── Photos section ────────────────────────────────────────
+                _SectionHeader(title: 'Profile Photos', icon: Icons.photo_library_outlined, colors: colors, text: text),
+                const SizedBox(height: AppTheme.spacingSm),
+                _PhotoGrid(
+                  photoRecords: profileProvider.photoRecords,
+                  uploading: _uploadingPhoto,
+                  onUpload: _pickAndUploadPhoto,
+                  onDelete: _deletePhoto,
+                  colors: colors,
+                  appColors: appColors,
+                ),
+                const SizedBox(height: AppTheme.spacingLg),
+
+                // ── Basic info ────────────────────────────────────────────
+                _SectionHeader(title: 'Basic Info', icon: Icons.person_outline, colors: colors, text: text),
+                const SizedBox(height: AppTheme.spacingSm),
+                TextFormField(
+                  controller: _firstNameCtrl,
+                  decoration: const InputDecoration(labelText: 'First Name', prefixIcon: Icon(Icons.badge_outlined)),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'First name is required' : null,
+                  textCapitalization: TextCapitalization.words,
+                ),
+                const SizedBox(height: AppTheme.spacingMd),
+                GestureDetector(
+                  onTap: () async {
+                    final now = DateTime.now();
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _dateOfBirth ?? DateTime(now.year - 30),
+                      firstDate: DateTime(1920),
+                      lastDate: DateTime(now.year - 18, now.month, now.day),
+                      helpText: 'You must be 18 or older',
+                    );
+                    if (picked != null) setState(() => _dateOfBirth = picked);
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Date of Birth',
+                      prefixIcon: Icon(Icons.cake_outlined),
+                    ),
+                    child: Text(
+                      _dateOfBirth != null
+                          ? '${_dateOfBirth!.month}/${_dateOfBirth!.day}/${_dateOfBirth!.year}'
+                          : 'Select your date of birth',
+                      style: text.bodyMedium?.copyWith(
+                        color: _dateOfBirth != null ? colors.onSurface : appColors.subtleText,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingMd),
+                DropdownButtonFormField<String>(
+                  value: _selectedGender,
+                  decoration: const InputDecoration(labelText: 'Gender', prefixIcon: Icon(Icons.people_outline)),
+                  items: _genderOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                  onChanged: (v) => setState(() => _selectedGender = v),
+                ),
+                const SizedBox(height: AppTheme.spacingMd),
+                DropdownButtonFormField<String>(
+                  value: _selectedRelationshipStatus,
+                  decoration: const InputDecoration(labelText: 'Relationship Status', prefixIcon: Icon(Icons.favorite_border)),
+                  items: _relationshipOptions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                  onChanged: (v) => setState(() => _selectedRelationshipStatus = v),
+                ),
+                const SizedBox(height: AppTheme.spacingLg),
+
+                // ── Location ──────────────────────────────────────────────
+                _SectionHeader(title: 'Location', icon: Icons.location_on_outlined, colors: colors, text: text),
+                const SizedBox(height: AppTheme.spacingSm),
+                DropdownButtonFormField<String>(
+                  value: _selectedState,
+                  decoration: const InputDecoration(labelText: 'State', prefixIcon: Icon(Icons.map_outlined)),
+                  isExpanded: true,
+                  items: _usStates.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                  onChanged: (v) => setState(() => _selectedState = v),
+                ),
+                const SizedBox(height: AppTheme.spacingMd),
+                TextFormField(
+                  controller: _cityCtrl,
+                  decoration: const InputDecoration(labelText: 'City', prefixIcon: Icon(Icons.location_city_outlined)),
+                  textCapitalization: TextCapitalization.words,
+                ),
+                const SizedBox(height: AppTheme.spacingLg),
+
+                // ── About Me ──────────────────────────────────────────────
+                _SectionHeader(title: 'About Me', icon: Icons.info_outline, colors: colors, text: text),
+                const SizedBox(height: AppTheme.spacingSm),
+                TextFormField(
+                  controller: _aboutMeCtrl,
+                  maxLines: 5,
+                  maxLength: 500,
+                  decoration: const InputDecoration(
+                    labelText: 'Tell people about yourself',
+                    alignLabelWithHint: true,
+                    prefixIcon: Padding(
+                      padding: EdgeInsets.only(bottom: AppTheme.spacingXxl),
+                      child: Icon(Icons.edit_outlined),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingLg),
+
+                // ── Looking For ───────────────────────────────────────────
+                _SectionHeader(title: 'Looking For', icon: Icons.search_outlined, colors: colors, text: text),
+                const SizedBox(height: AppTheme.spacingSm),
+                _ChipSelector(
+                  options: LookingForOptions.all,
+                  selected: _selectedLookingFor,
+                  onToggle: (v) => setState(() {
+                    _selectedLookingFor.contains(v)
+                        ? _selectedLookingFor.remove(v)
+                        : _selectedLookingFor.add(v);
+                  }),
+                  colors: colors,
+                ),
+                const SizedBox(height: AppTheme.spacingLg),
+
+                // ── Interests ─────────────────────────────────────────────
+                _SectionHeader(title: 'Interests', icon: Icons.interests_outlined, colors: colors, text: text),
+                const SizedBox(height: AppTheme.spacingSm),
+                _ChipSelector(
+                  options: InterestOptions.all,
+                  selected: _selectedInterests,
+                  onToggle: (v) => setState(() {
+                    _selectedInterests.contains(v)
+                        ? _selectedInterests.remove(v)
+                        : _selectedInterests.add(v);
+                  }),
+                  colors: colors,
+                ),
+                const SizedBox(height: AppTheme.spacingLg),
+
+                // ── Life Situation ────────────────────────────────────────
+                _SectionHeader(title: 'Life Situation', icon: Icons.timeline_outlined, colors: colors, text: text),
+                const SizedBox(height: AppTheme.spacingSm),
+                _ChipSelector(
+                  options: LifeSituationOptions.all,
+                  selected: _selectedLifeSituation,
+                  onToggle: (v) => setState(() {
+                    _selectedLifeSituation.contains(v)
+                        ? _selectedLifeSituation.remove(v)
+                        : _selectedLifeSituation.add(v);
+                  }),
+                  colors: colors,
+                ),
+                const SizedBox(height: AppTheme.spacingXxl),
+
+                // ── Save button ───────────────────────────────────────────
+                ElevatedButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: _saving
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.save_outlined),
+                  label: Text(_saving ? 'Saving…' : 'Save Profile'),
+                ),
+                const SizedBox(height: AppTheme.spacingLg),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Helper widgets ───────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final ColorScheme colors;
+  final TextTheme text;
+
+  const _SectionHeader({required this.title, required this.icon, required this.colors, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: AppTheme.iconMd, color: colors.primary),
+        const SizedBox(width: AppTheme.spacingSm),
+        Text(title, style: text.titleMedium?.copyWith(color: colors.primary)),
+      ],
+    );
+  }
+}
+
+class _ChipSelector extends StatelessWidget {
+  final List<String> options;
+  final List<String> selected;
+  final ValueChanged<String> onToggle;
+  final ColorScheme colors;
+
+  const _ChipSelector({
+    required this.options,
+    required this.selected,
+    required this.onToggle,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppTheme.spacingSm,
+      runSpacing: AppTheme.spacingSm,
+      children: options.map((option) {
+        final isSelected = selected.contains(option);
+        return FilterChip(
+          label: Text(option),
+          selected: isSelected,
+          onSelected: (_) => onToggle(option),
+          selectedColor: colors.primaryContainer,
+          checkmarkColor: colors.primary,
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _PhotoGrid extends StatelessWidget {
+  final List<Map<String, dynamic>> photoRecords;
+  final bool uploading;
+  final VoidCallback onUpload;
+  final ValueChanged<String> onDelete;
+  final ColorScheme colors;
+  final AppColorsExtension appColors;
+
+  const _PhotoGrid({
+    required this.photoRecords,
+    required this.uploading,
+    required this.onUpload,
+    required this.onDelete,
+    required this.colors,
+    required this.appColors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppTheme.spacingSm,
+      runSpacing: AppTheme.spacingSm,
+      children: [
+        ...photoRecords.map((record) {
+          final photoId = record['id'] as String;
+          final url = record['display_url'] as String;
+          return _PhotoTile(
+            url: url,
+            onDelete: () => onDelete(photoId),
+            colors: colors,
+            appColors: appColors,
+          );
+        }),
+        // Upload button
+        GestureDetector(
+          onTap: uploading ? null : onUpload,
+          child: Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+              border: Border.all(color: colors.outlineVariant, style: BorderStyle.solid),
+            ),
+            child: uploading
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add_photo_alternate_outlined, color: colors.primary, size: AppTheme.iconLg),
+                      const SizedBox(height: AppTheme.spacingXs),
+                      Text('Add Photo', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: colors.primary)),
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PhotoTile extends StatelessWidget {
+  final String url;
+  final VoidCallback onDelete;
+  final ColorScheme colors;
+  final AppColorsExtension appColors;
+
+  const _PhotoTile({required this.url, required this.onDelete, required this.colors, required this.appColors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+          child: Image.network(
+            url,
+            width: 100,
+            height: 100,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              width: 100,
+              height: 100,
+              color: colors.surfaceContainerLow,
+              child: Icon(Icons.broken_image_outlined, color: appColors.subtleText),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: GestureDetector(
+            onTap: onDelete,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: appColors.danger,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, size: 14, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Supabase diagnostics panel ──────────────────────────────────────────────
+
+class _SupabaseDiagnosticsPanel extends StatelessWidget {
+  final AuthProvider auth;
+  final ProfileProvider profileProvider;
+  final ColorScheme colors;
+  final TextTheme text;
+  final AppColorsExtension appColors;
+
+  const _SupabaseDiagnosticsPanel({
+    required this.auth,
+    required this.profileProvider,
+    required this.colors,
+    required this.text,
+    required this.appColors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isConfigured = SupabaseService.isConfigured;
+    final clientAvailable = SupabaseService.client != null;
+    final isMockMode = !isConfigured || !clientAvailable;
+    final userId = auth.userId;
+    final profileLoaded = profileProvider.profile != null;
+    final configError = SupabaseService.configurationError;
+    final initError = SupabaseService.initError;
+
+    final panelColor = isMockMode
+        ? appColors.danger.withOpacity(0.08)
+        : appColors.success.withOpacity(0.08);
+    final borderColor = isMockMode
+        ? appColors.danger.withOpacity(0.35)
+        : appColors.success.withOpacity(0.35);
+
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacingMd),
+      decoration: BoxDecoration(
+        color: panelColor,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isMockMode ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                size: AppTheme.iconSm,
+                color: isMockMode ? appColors.danger : appColors.success,
+              ),
+              const SizedBox(width: AppTheme.spacingXs),
+              Text(
+                'Supabase Connection',
+                style: text.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: isMockMode ? appColors.danger : appColors.success,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingSm),
+          _DiagRow(
+            label: 'Supabase configured',
+            value: isConfigured ? 'YES' : 'NO',
+            ok: isConfigured,
+            text: text,
+            appColors: appColors,
+          ),
+          _DiagRow(
+            label: 'Mock mode active',
+            value: isMockMode ? 'YES ⚠' : 'NO ✓',
+            ok: !isMockMode,
+            text: text,
+            appColors: appColors,
+          ),
+          _DiagRow(
+            label: 'Current user ID',
+            value: userId ?? 'NONE',
+            ok: userId != null,
+            text: text,
+            appColors: appColors,
+          ),
+          _DiagRow(
+            label: 'Profile loaded from Supabase',
+            value: profileLoaded ? 'YES' : 'NO',
+            ok: profileLoaded,
+            text: text,
+            appColors: appColors,
+          ),
+          _DiagRow(
+            label: 'Last save target',
+            value: isMockMode ? 'Mock (no persistence)' : 'Supabase',
+            ok: !isMockMode,
+            text: text,
+            appColors: appColors,
+          ),
+          if (configError != null) ...[
+            const SizedBox(height: AppTheme.spacingXs),
+            Text(
+              '⚠ Config error: $configError',
+              style: text.bodySmall?.copyWith(color: appColors.danger, height: 1.5),
+            ),
+          ],
+          if (initError != null && configError == null) ...[
+            const SizedBox(height: AppTheme.spacingXs),
+            Text(
+              '⚠ Init error: $initError',
+              style: text.bodySmall?.copyWith(color: appColors.danger, height: 1.5),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DiagRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool ok;
+  final TextTheme text;
+  final AppColorsExtension appColors;
+
+  const _DiagRow({
+    required this.label,
+    required this.value,
+    required this.ok,
+    required this.text,
+    required this.appColors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: text.bodySmall?.copyWith(color: appColors.subtleText),
+            ),
+          ),
+          Text(
+            value,
+            style: text.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: ok ? appColors.success : appColors.danger,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── US States list ───────────────────────────────────────────────────────────
+
+const List<String> _usStates = [
+  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado',
+  'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho',
+  'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana',
+  'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota',
+  'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
+  'New Hampshire', 'New Jersey', 'New Mexico', 'New York',
+  'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon',
+  'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+  'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+  'West Virginia', 'Wisconsin', 'Wyoming',
+];
