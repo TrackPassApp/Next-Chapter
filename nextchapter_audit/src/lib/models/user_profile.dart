@@ -11,6 +11,9 @@ class UserProfile {
   final List<String> lookingFor;
   final List<String> interests;
   final List<String> lifeSituation;
+  final List<String> modes;
+  final bool isComplete;
+  final int completenessScore;
   final bool emailVerified;
   final bool phoneVerified;
   final bool selfieVerified;
@@ -32,6 +35,9 @@ class UserProfile {
     required this.lookingFor,
     required this.interests,
     required this.lifeSituation,
+    this.modes = const ['date'],
+    this.isComplete = false,
+    this.completenessScore = 0,
     this.emailVerified = false,
     this.phoneVerified = false,
     this.selfieVerified = false,
@@ -154,5 +160,71 @@ class InterestOptions {
     'Technology',
     'Writing',
     'Sports',
+  ];
+}
+
+class GenderOptions {
+  static const List<String> all = [
+    'Woman',
+    'Man',
+    'Non-binary',
+    'Transgender Woman',
+    'Transgender Man',
+    'Two-spirit',
+    'Prefer to self-describe',
+    'Prefer not to say',
+  ];
+}
+
+class RelationshipStatusOptions {
+  static const List<String> all = [
+    'Single',
+    'Divorced',
+    'Widowed',
+    'Separated',
+    "It's complicated",
+  ];
+}
+
+class ModeOptions {
+  static const String date = 'date';
+  static const String friend = 'friend';
+  static const String activity = 'activity';
+
+  static const List<String> all = [date, friend, activity];
+
+  static String label(String key) {
+    switch (key) {
+      case date:
+        return 'Dating';
+      case friend:
+        return 'Friendship';
+      case activity:
+        return 'Activity Partner';
+      default:
+        return key;
+    }
+  }
+
+  static String description(String key) {
+    switch (key) {
+      case date:
+        return 'Open to dating and romantic connections.';
+      case friend:
+        return 'Looking for genuine friendships in your area or online.';
+      case activity:
+        return 'Want to find people who share your hobbies and interests.';
+      default:
+        return '';
+    }
+  }
+}
+
+class UsStates {
+  static const List<String> all = [
+    'AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN',
+    'IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH',
+    'NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT',
+    'VT','VA','WA','WV','WI','WY',
   ];
 }

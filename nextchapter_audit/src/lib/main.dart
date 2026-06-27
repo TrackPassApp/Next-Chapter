@@ -65,7 +65,7 @@ class _MyAppState extends State<MyApp> {
       child: MaterialApp.router(
         title: 'Next Chapter',
         theme: AppTheme.lightTheme,
-        routerConfig: AppRouter.router(_authProvider),
+        routerConfig: AppRouter.router(_authProvider, profileProvider: _profileProvider),
       ),
     );
   }

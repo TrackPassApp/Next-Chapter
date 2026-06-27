@@ -4,11 +4,13 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/browse_provider.dart';
 import '../providers/messages_provider.dart';
+import '../providers/profile_provider.dart';
 import '../screens/landing_screen.dart';
 import '../screens/auth_screen.dart';
 import '../screens/forgot_password_screen.dart';
 import '../screens/browse_screen.dart';
 import '../screens/edit_profile_screen.dart';
+import '../screens/onboarding_screen.dart';
 import '../screens/profile_detail_screen.dart';
 import '../screens/messages_screen.dart';
 import '../screens/chat_screen.dart';
@@ -20,31 +22,50 @@ import '../screens/app_shell.dart';
 import '../screens/diagnostics_screen.dart';
 
 class AppRouter {
-  static GoRouter router(AuthProvider authProvider) => GoRouter(
+  static GoRouter router(AuthProvider authProvider, {ProfileProvider? profileProvider}) => GoRouter(
     initialLocation: '/',
-    refreshListenable: authProvider,
+    refreshListenable: profileProvider == null
+        ? authProvider
+        : Listenable.merge([authProvider, profileProvider]),
     redirect: (context, state) {
-      // While the initial session is being restored from storage, show nothing.
       if (authProvider.isLoading) return null;
 
       final loggedIn = authProvider.isLoggedIn;
       final loc = state.matchedLocation;
 
       final isAuthRoute = loc == '/login' || loc == '/signup' || loc == '/forgot-password';
-      // Note: /diagnostics is intentionally NOT in this public list.
-      // It is restricted below to debug builds or signed-in admins.
       final isPublic = loc == '/' || loc == '/privacy' || loc == '/terms' || isAuthRoute;
 
-      // Standard logged-out gating.
       if (!loggedIn && !isPublic && loc != '/diagnostics') return '/login';
       if (loggedIn && (loc == '/' || isAuthRoute)) return '/browse';
 
-      // Admin-only gating. Defense-in-depth — AdminScreen also self-guards.
+      // Logged-in users with an incomplete profile go to the wizard.
+      // We read profileProvider via Provider.of(context, listen:false) to
+      // avoid wiring it into refreshListenable (auth changes are what drive
+      // re-evaluation; profile completion changes trigger a manual go).
+      if (loggedIn && loc != '/welcome' && loc != '/admin' && loc != '/diagnostics') {
+        try {
+          final pp = Provider.of<ProfileProvider>(context, listen: false);
+          if (pp.profile != null && !pp.profile!.isComplete) {
+            return '/welcome';
+          }
+        } catch (_) {
+          // Provider not in scope (rare); skip the check.
+        }
+      }
+
+      if (loc == '/welcome' && !loggedIn) return '/login';
+      if (loc == '/welcome' && loggedIn) {
+        try {
+          final pp = Provider.of<ProfileProvider>(context, listen: false);
+          if (pp.profile != null && pp.profile!.isComplete) return '/browse';
+        } catch (_) {}
+      }
+
       if (loc == '/admin' && !authProvider.isAdmin) {
         return loggedIn ? '/browse' : '/login';
       }
 
-      // Diagnostics route: debug builds OR signed-in admins only.
       if (loc == '/diagnostics' && !kDebugMode && !authProvider.isAdmin) {
         return loggedIn ? '/browse' : '/';
       }
@@ -59,6 +80,7 @@ class AppRouter {
       GoRoute(path: '/privacy', builder: (_, __) => const PrivacyScreen()),
       GoRoute(path: '/terms', builder: (_, __) => const TermsScreen()),
       GoRoute(path: '/admin', builder: (_, __) => const AdminScreen()),
+      GoRoute(path: '/welcome', builder: (_, __) => const OnboardingScreen()),
       GoRoute(path: '/diagnostics', builder: (_, __) => const DiagnosticsScreen()),
       GoRoute(path: '/edit-profile', builder: (_, __) => const EditProfileScreen()),
       GoRoute(

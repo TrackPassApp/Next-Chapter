@@ -80,11 +80,14 @@ class ProfileRepository {
     required String gender,
     required String relationshipStatus,
     required String aboutMe,
+    List<String>? modes,
+    bool? isComplete,
+    int? completenessScore,
   }) async {
     final db = SupabaseService.client;
     if (db == null) return null;
 
-    final data = {
+    final data = <String, dynamic>{
       'user_id': userId,
       'first_name': firstName,
       'date_of_birth': dateOfBirth.toIso8601String().split('T').first,
@@ -95,6 +98,9 @@ class ProfileRepository {
       'about_me': aboutMe,
       'updated_at': DateTime.now().toIso8601String(),
     };
+    if (modes != null) data['modes'] = modes;
+    if (isComplete != null) data['is_complete'] = isComplete;
+    if (completenessScore != null) data['completeness_score'] = completenessScore;
 
     final result = await db
         .from('profiles')
@@ -103,6 +109,17 @@ class ProfileRepository {
         .single();
 
     return result['id'] as String?;
+  }
+
+  /// Mark a profile complete (called at end of onboarding wizard).
+  Future<void> markComplete(String userId, {int completenessScore = 60}) async {
+    final db = SupabaseService.client;
+    if (db == null) return;
+    await db.from('profiles').update({
+      'is_complete': true,
+      'completeness_score': completenessScore,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('user_id', userId);
   }
 
   /// Replace all interests for a profile (delete-then-insert pattern).
@@ -226,6 +243,9 @@ class ProfileRepository {
       interests: interests.map((i) => i['interest'] as String).toList(),
       lookingFor: lookingFor.map((l) => l['looking_for'] as String).toList(),
       lifeSituation: lifeSit.map((s) => s['life_situation'] as String).toList(),
+      modes: (row['modes'] as List?)?.map((m) => m.toString()).toList() ?? const ['date'],
+      isComplete: row['is_complete'] as bool? ?? false,
+      completenessScore: (row['completeness_score'] as num?)?.toInt() ?? 0,
       emailVerified: verRow?['email_verified'] as bool? ?? false,
       phoneVerified: verRow?['phone_verified'] as bool? ?? false,
       selfieVerified: verRow?['selfie_verified'] as bool? ?? false,
