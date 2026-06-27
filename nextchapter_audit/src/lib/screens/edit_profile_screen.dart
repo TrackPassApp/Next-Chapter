@@ -1,14 +1,15 @@
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import '../data/prompts_catalog.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
 import '../services/supabase_service.dart';
 import '../theme/theme.dart';
+import '../widgets/common/completeness_ring.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -32,6 +33,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final List<String> _selectedLookingFor = [];
   final List<String> _selectedInterests = [];
   final List<String> _selectedLifeSituation = [];
+  final List<String> _selectedModes = [];
+
+  // 3 prompt slots — each can be null or {key, answer}.
+  final List<_PromptDraft> _promptDrafts = [
+    _PromptDraft(),
+    _PromptDraft(),
+    _PromptDraft(),
+  ];
 
   bool _saving = false;
   bool _uploadingPhoto = false;
@@ -41,7 +50,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     'Male', 'Female', 'Non-binary', 'Prefer not to say',
   ];
   static const List<String> _relationshipOptions = [
-    'Single', 'Divorced', 'Widowed', 'Separated', 'It\'s complicated',
+    'Single', 'Divorced', 'Widowed', 'Separated', "It's complicated",
   ];
 
   @override
@@ -59,11 +68,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _aboutMeCtrl.text = profile.aboutMe;
     _selectedState = profile.state.isEmpty ? null : profile.state;
     _selectedGender = profile.gender.isEmpty ? null : profile.gender;
-    _selectedRelationshipStatus = profile.relationshipStatus.isEmpty ? null : profile.relationshipStatus;
+    _selectedRelationshipStatus =
+        profile.relationshipStatus.isEmpty ? null : profile.relationshipStatus;
     _dateOfBirth = profile.dateOfBirth.year > 1900 ? profile.dateOfBirth : null;
     _selectedLookingFor.addAll(profile.lookingFor);
     _selectedInterests.addAll(profile.interests);
     _selectedLifeSituation.addAll(profile.lifeSituation);
+    _selectedModes.addAll(profile.modes.isEmpty ? ['date'] : profile.modes);
+
+    for (int i = 0; i < profile.prompts.length && i < 3; i++) {
+      _promptDrafts[i].key = profile.prompts[i].promptKey;
+      _promptDrafts[i].controller.text = profile.prompts[i].answer;
+    }
   }
 
   @override
@@ -71,10 +87,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _firstNameCtrl.dispose();
     _cityCtrl.dispose();
     _aboutMeCtrl.dispose();
+    for (final p in _promptDrafts) {
+      p.controller.dispose();
+    }
     super.dispose();
   }
 
-  // ─── Save ─────────────────────────────────────────────────────────────────
+  // ─── Save ────────────────────────────────────────────────────────────────
+
+  List<PromptAnswer> _collectedPrompts() {
+    final list = <PromptAnswer>[];
+    for (int i = 0; i < _promptDrafts.length; i++) {
+      final d = _promptDrafts[i];
+      final answer = d.controller.text.trim();
+      if (d.key != null && answer.isNotEmpty) {
+        list.add(PromptAnswer(promptKey: d.key!, answer: answer, position: i));
+      }
+    }
+    return list;
+  }
+
+  int _liveCompleteness(int photoCount) {
+    return UserProfile.computeCompleteness(
+      firstName: _firstNameCtrl.text,
+      dateOfBirth: _dateOfBirth,
+      city: _cityCtrl.text,
+      state: _selectedState ?? '',
+      gender: _selectedGender ?? '',
+      relationshipStatus: _selectedRelationshipStatus ?? '',
+      aboutMe: _aboutMeCtrl.text,
+      modes: _selectedModes,
+      lookingFor: _selectedLookingFor,
+      interests: _selectedInterests,
+      lifeSituation: _selectedLifeSituation,
+      prompts: _collectedPrompts(),
+      photoCount: photoCount,
+    );
+  }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -90,13 +139,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       setState(() => _errorMessage = 'Please select your gender.');
       return;
     }
+    if (_selectedModes.isEmpty) {
+      setState(() => _errorMessage = 'Pick at least one mode (Dating, Friendship, or Activity).');
+      return;
+    }
 
-    setState(() { _saving = true; _errorMessage = null; });
+    setState(() {
+      _saving = true;
+      _errorMessage = null;
+    });
 
     final auth = context.read<AuthProvider>();
     final profileProvider = context.read<ProfileProvider>();
 
-    // Hard-fail if Supabase is not connected — never silently save in mock mode.
     if (!SupabaseService.isConfigured || SupabaseService.client == null) {
       setState(() {
         _saving = false;
@@ -110,7 +165,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     final userId = auth.userId;
     if (userId == null) {
-      setState(() { _saving = false; _errorMessage = 'Not logged in.'; });
+      setState(() {
+        _saving = false;
+        _errorMessage = 'Not logged in.';
+      });
       return;
     }
 
@@ -126,6 +184,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       lookingFor: List.from(_selectedLookingFor),
       interests: List.from(_selectedInterests),
       lifeSituation: List.from(_selectedLifeSituation),
+      modes: List.from(_selectedModes),
+      prompts: _collectedPrompts(),
       isEmailVerified: auth.isEmailVerified,
     );
 
@@ -142,7 +202,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  // ─── Photo upload ─────────────────────────────────────────────────────────
+  // ─── Photo upload ────────────────────────────────────────────────────────
 
   Future<void> _pickAndUploadPhoto() async {
     final auth = context.read<AuthProvider>();
@@ -155,22 +215,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    Uint8List? bytes;
-    String mimeType = 'image/jpeg';
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (file == null) return;
 
-    if (kIsWeb) {
-      final picker = ImagePicker();
-      final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-      if (file == null) return;
-      bytes = await file.readAsBytes();
-      mimeType = file.mimeType ?? 'image/jpeg';
-    } else {
-      final picker = ImagePicker();
-      final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-      if (file == null) return;
-      bytes = await file.readAsBytes();
-      mimeType = file.mimeType ?? 'image/jpeg';
-    }
+    final Uint8List bytes = await file.readAsBytes();
+    final String mimeType = file.mimeType ?? 'image/jpeg';
 
     setState(() => _uploadingPhoto = true);
 
@@ -209,7 +259,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     await context.read<ProfileProvider>().deletePhoto(photoId);
   }
 
-  // ─── Build ────────────────────────────────────────────────────────────────
+  // ─── Build ───────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -218,6 +268,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final text = theme.textTheme;
     final appColors = theme.extension<AppColorsExtension>()!;
     final profileProvider = context.watch<ProfileProvider>();
+    final photoCount = profileProvider.photoRecords.length;
+    final completeness = _liveCompleteness(photoCount);
 
     return Scaffold(
       appBar: AppBar(
@@ -240,10 +292,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           constraints: const BoxConstraints(maxWidth: 700),
           child: Form(
             key: _formKey,
+            onChanged: () => setState(() {}),
             child: ListView(
               padding: const EdgeInsets.all(AppTheme.spacingMd),
               children: [
-                  // ── Supabase diagnostics panel ────────────────────────────
                 _SupabaseDiagnosticsPanel(
                   auth: context.watch<AuthProvider>(),
                   profileProvider: profileProvider,
@@ -251,6 +303,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   text: text,
                   appColors: appColors,
                 ),
+                const SizedBox(height: AppTheme.spacingMd),
+
+                _CompletenessHeader(score: completeness, colors: colors, text: text),
                 const SizedBox(height: AppTheme.spacingMd),
 
                 if (_errorMessage != null) ...[
@@ -266,7 +321,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   const SizedBox(height: AppTheme.spacingMd),
                 ],
 
-                // ── Photos section ────────────────────────────────────────
+                // ── Photos ─────────────────────────────────────────────
                 _SectionHeader(title: 'Profile Photos', icon: Icons.photo_library_outlined, colors: colors, text: text),
                 const SizedBox(height: AppTheme.spacingSm),
                 _PhotoGrid(
@@ -279,7 +334,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: AppTheme.spacingLg),
 
-                // ── Basic info ────────────────────────────────────────────
+                // ── Modes ──────────────────────────────────────────────
+                _SectionHeader(title: 'I am here to…', icon: Icons.tune, colors: colors, text: text),
+                const SizedBox(height: AppTheme.spacingSm),
+                _ModesSelector(
+                  selected: _selectedModes,
+                  onToggle: (m) => setState(() {
+                    if (_selectedModes.contains(m)) {
+                      _selectedModes.remove(m);
+                    } else {
+                      _selectedModes.add(m);
+                    }
+                  }),
+                  colors: colors,
+                  text: text,
+                  appColors: appColors,
+                ),
+                const SizedBox(height: AppTheme.spacingLg),
+
+                // ── Basic info ─────────────────────────────────────────
                 _SectionHeader(title: 'Basic Info', icon: Icons.person_outline, colors: colors, text: text),
                 const SizedBox(height: AppTheme.spacingSm),
                 TextFormField(
@@ -332,7 +405,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: AppTheme.spacingLg),
 
-                // ── Location ──────────────────────────────────────────────
+                // ── Location ──────────────────────────────────────────
                 _SectionHeader(title: 'Location', icon: Icons.location_on_outlined, colors: colors, text: text),
                 const SizedBox(height: AppTheme.spacingSm),
                 DropdownButtonFormField<String>(
@@ -350,7 +423,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: AppTheme.spacingLg),
 
-                // ── About Me ──────────────────────────────────────────────
+                // ── About Me ──────────────────────────────────────────
                 _SectionHeader(title: 'About Me', icon: Icons.info_outline, colors: colors, text: text),
                 const SizedBox(height: AppTheme.spacingSm),
                 TextFormField(
@@ -358,7 +431,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   maxLines: 5,
                   maxLength: 500,
                   decoration: const InputDecoration(
-                    labelText: 'Tell people about yourself',
+                    labelText: 'Tell people about yourself (≥30 chars)',
                     alignLabelWithHint: true,
                     prefixIcon: Padding(
                       padding: EdgeInsets.only(bottom: AppTheme.spacingXxl),
@@ -368,7 +441,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: AppTheme.spacingLg),
 
-                // ── Looking For ───────────────────────────────────────────
+                // ── Prompts ───────────────────────────────────────────
+                _SectionHeader(
+                  title: 'Your Story (up to 3 prompts)',
+                  icon: Icons.format_quote_outlined,
+                  colors: colors,
+                  text: text,
+                ),
+                const SizedBox(height: AppTheme.spacingSm),
+                Text(
+                  'Pick prompts that help people understand who you are.',
+                  style: text.bodySmall?.copyWith(color: appColors.subtleText),
+                ),
+                const SizedBox(height: AppTheme.spacingSm),
+                for (int i = 0; i < _promptDrafts.length; i++) ...[
+                  _PromptEditor(
+                    index: i,
+                    draft: _promptDrafts[i],
+                    usedKeys: _promptDrafts
+                        .where((d) => d != _promptDrafts[i])
+                        .map((d) => d.key)
+                        .whereType<String>()
+                        .toSet(),
+                    onChanged: () => setState(() {}),
+                    colors: colors,
+                    appColors: appColors,
+                    text: text,
+                  ),
+                  const SizedBox(height: AppTheme.spacingMd),
+                ],
+                const SizedBox(height: AppTheme.spacingSm),
+
+                // ── Looking For ───────────────────────────────────────
                 _SectionHeader(title: 'Looking For', icon: Icons.search_outlined, colors: colors, text: text),
                 const SizedBox(height: AppTheme.spacingSm),
                 _ChipSelector(
@@ -383,7 +487,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: AppTheme.spacingLg),
 
-                // ── Interests ─────────────────────────────────────────────
+                // ── Interests ─────────────────────────────────────────
                 _SectionHeader(title: 'Interests', icon: Icons.interests_outlined, colors: colors, text: text),
                 const SizedBox(height: AppTheme.spacingSm),
                 _ChipSelector(
@@ -398,7 +502,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: AppTheme.spacingLg),
 
-                // ── Life Situation ────────────────────────────────────────
+                // ── Life Situation ────────────────────────────────────
                 _SectionHeader(title: 'Life Situation', icon: Icons.timeline_outlined, colors: colors, text: text),
                 const SizedBox(height: AppTheme.spacingSm),
                 _ChipSelector(
@@ -413,7 +517,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: AppTheme.spacingXxl),
 
-                // ── Save button ───────────────────────────────────────────
+                // ── Save button ───────────────────────────────────────
                 ElevatedButton.icon(
                   onPressed: _saving ? null : _save,
                   icon: _saving
@@ -431,7 +535,210 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 }
 
-// ─── Helper widgets ───────────────────────────────────────────────────────────
+// ─── Prompt draft holder ─────────────────────────────────────────────────────
+
+class _PromptDraft {
+  String? key;
+  final TextEditingController controller = TextEditingController();
+}
+
+// ─── Helper widgets ──────────────────────────────────────────────────────────
+
+class _CompletenessHeader extends StatelessWidget {
+  final int score;
+  final ColorScheme colors;
+  final TextTheme text;
+
+  const _CompletenessHeader({required this.score, required this.colors, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacingMd),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          CompletenessRing(score: score, size: 64),
+          const SizedBox(width: AppTheme.spacingMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Profile completeness', style: text.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  score >= 80
+                      ? 'Looking great! Your profile stands out.'
+                      : score >= 50
+                          ? 'Good start — add photos and prompts to boost it.'
+                          : 'Add more details to attract better matches.',
+                  style: text.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModesSelector extends StatelessWidget {
+  final List<String> selected;
+  final ValueChanged<String> onToggle;
+  final ColorScheme colors;
+  final TextTheme text;
+  final AppColorsExtension appColors;
+
+  const _ModesSelector({
+    required this.selected,
+    required this.onToggle,
+    required this.colors,
+    required this.text,
+    required this.appColors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: ModeOptions.all.map((mode) {
+        final isSel = selected.contains(mode);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppTheme.spacingSm),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+            onTap: () => onToggle(mode),
+            child: Container(
+              padding: const EdgeInsets.all(AppTheme.spacingMd),
+              decoration: BoxDecoration(
+                color: isSel ? colors.primaryContainer.withOpacity(0.4) : colors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                border: Border.all(
+                  color: isSel ? colors.primary : colors.outlineVariant,
+                  width: isSel ? 2 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isSel ? Icons.check_circle : Icons.radio_button_unchecked,
+                    color: isSel ? colors.primary : appColors.subtleText,
+                  ),
+                  const SizedBox(width: AppTheme.spacingMd),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(ModeOptions.label(mode), style: text.titleSmall),
+                        const SizedBox(height: 2),
+                        Text(
+                          ModeOptions.description(mode),
+                          style: text.bodySmall?.copyWith(color: appColors.subtleText),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _PromptEditor extends StatelessWidget {
+  final int index;
+  final _PromptDraft draft;
+  final Set<String> usedKeys;
+  final VoidCallback onChanged;
+  final ColorScheme colors;
+  final AppColorsExtension appColors;
+  final TextTheme text;
+
+  const _PromptEditor({
+    required this.index,
+    required this.draft,
+    required this.usedKeys,
+    required this.onChanged,
+    required this.colors,
+    required this.appColors,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final available = PromptCatalog.all
+        .where((p) => !usedKeys.contains(p))
+        .toList();
+
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacingMd),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.format_quote, size: AppTheme.iconSm, color: colors.primary),
+              const SizedBox(width: AppTheme.spacingXs),
+              Text('Prompt ${index + 1}', style: text.labelLarge?.copyWith(color: colors.primary)),
+              const Spacer(),
+              if (draft.key != null)
+                IconButton(
+                  tooltip: 'Clear prompt',
+                  icon: Icon(Icons.close, size: 18, color: appColors.subtleText),
+                  onPressed: () {
+                    draft.key = null;
+                    draft.controller.clear();
+                    onChanged();
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingSm),
+          DropdownButtonFormField<String>(
+            value: draft.key,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Choose a prompt'),
+            items: [
+              if (draft.key != null && !available.contains(draft.key))
+                DropdownMenuItem(value: draft.key, child: Text(draft.key!, overflow: TextOverflow.ellipsis)),
+              ...available.map((p) => DropdownMenuItem(value: p, child: Text(p, overflow: TextOverflow.ellipsis))),
+            ],
+            onChanged: (v) {
+              draft.key = v;
+              onChanged();
+            },
+          ),
+          if (draft.key != null) ...[
+            const SizedBox(height: AppTheme.spacingSm),
+            TextField(
+              controller: draft.controller,
+              maxLength: 150,
+              maxLines: 3,
+              minLines: 2,
+              onChanged: (_) => onChanged(),
+              decoration: const InputDecoration(
+                labelText: 'Your answer',
+                hintText: 'Keep it real — 150 chars max',
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
 class _SectionHeader extends StatelessWidget {
   final String title;
@@ -518,7 +825,6 @@ class _PhotoGrid extends StatelessWidget {
             appColors: appColors,
           );
         }),
-        // Upload button
         GestureDetector(
           onTap: uploading ? null : onUpload,
           child: Container(
@@ -527,7 +833,7 @@ class _PhotoGrid extends StatelessWidget {
             decoration: BoxDecoration(
               color: colors.surfaceContainerLow,
               borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-              border: Border.all(color: colors.outlineVariant, style: BorderStyle.solid),
+              border: Border.all(color: colors.outlineVariant),
             ),
             child: uploading
                 ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
@@ -593,7 +899,7 @@ class _PhotoTile extends StatelessWidget {
   }
 }
 
-// ─── Supabase diagnostics panel ──────────────────────────────────────────────
+// ─── Supabase diagnostics panel ─────────────────────────────────────────────
 
 class _SupabaseDiagnosticsPanel extends StatelessWidget {
   final AuthProvider auth;
@@ -655,54 +961,18 @@ class _SupabaseDiagnosticsPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppTheme.spacingSm),
-          _DiagRow(
-            label: 'Supabase configured',
-            value: isConfigured ? 'YES' : 'NO',
-            ok: isConfigured,
-            text: text,
-            appColors: appColors,
-          ),
-          _DiagRow(
-            label: 'Mock mode active',
-            value: isMockMode ? 'YES ⚠' : 'NO ✓',
-            ok: !isMockMode,
-            text: text,
-            appColors: appColors,
-          ),
-          _DiagRow(
-            label: 'Current user ID',
-            value: userId ?? 'NONE',
-            ok: userId != null,
-            text: text,
-            appColors: appColors,
-          ),
-          _DiagRow(
-            label: 'Profile loaded from Supabase',
-            value: profileLoaded ? 'YES' : 'NO',
-            ok: profileLoaded,
-            text: text,
-            appColors: appColors,
-          ),
-          _DiagRow(
-            label: 'Last save target',
-            value: isMockMode ? 'Mock (no persistence)' : 'Supabase',
-            ok: !isMockMode,
-            text: text,
-            appColors: appColors,
-          ),
+          _DiagRow(label: 'Supabase configured', value: isConfigured ? 'YES' : 'NO', ok: isConfigured, text: text, appColors: appColors),
+          _DiagRow(label: 'Mock mode active', value: isMockMode ? 'YES ⚠' : 'NO ✓', ok: !isMockMode, text: text, appColors: appColors),
+          _DiagRow(label: 'Current user ID', value: userId ?? 'NONE', ok: userId != null, text: text, appColors: appColors),
+          _DiagRow(label: 'Profile loaded from Supabase', value: profileLoaded ? 'YES' : 'NO', ok: profileLoaded, text: text, appColors: appColors),
+          _DiagRow(label: 'Last save target', value: isMockMode ? 'Mock (no persistence)' : 'Supabase', ok: !isMockMode, text: text, appColors: appColors),
           if (configError != null) ...[
             const SizedBox(height: AppTheme.spacingXs),
-            Text(
-              '⚠ Config error: $configError',
-              style: text.bodySmall?.copyWith(color: appColors.danger, height: 1.5),
-            ),
+            Text('⚠ Config error: $configError', style: text.bodySmall?.copyWith(color: appColors.danger, height: 1.5)),
           ],
           if (initError != null && configError == null) ...[
             const SizedBox(height: AppTheme.spacingXs),
-            Text(
-              '⚠ Init error: $initError',
-              style: text.bodySmall?.copyWith(color: appColors.danger, height: 1.5),
-            ),
+            Text('⚠ Init error: $initError', style: text.bodySmall?.copyWith(color: appColors.danger, height: 1.5)),
           ],
         ],
       ),
@@ -717,13 +987,7 @@ class _DiagRow extends StatelessWidget {
   final TextTheme text;
   final AppColorsExtension appColors;
 
-  const _DiagRow({
-    required this.label,
-    required this.value,
-    required this.ok,
-    required this.text,
-    required this.appColors,
-  });
+  const _DiagRow({required this.label, required this.value, required this.ok, required this.text, required this.appColors});
 
   @override
   Widget build(BuildContext context) {
@@ -731,26 +995,15 @@ class _DiagRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: text.bodySmall?.copyWith(color: appColors.subtleText),
-            ),
-          ),
-          Text(
-            value,
-            style: text.bodySmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: ok ? appColors.success : appColors.danger,
-            ),
-          ),
+          Expanded(child: Text(label, style: text.bodySmall?.copyWith(color: appColors.subtleText))),
+          Text(value, style: text.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: ok ? appColors.success : appColors.danger)),
         ],
       ),
     );
   }
 }
 
-// ─── US States list ───────────────────────────────────────────────────────────
+// ─── US States list ──────────────────────────────────────────────────────────
 
 const List<String> _usStates = [
   'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado',

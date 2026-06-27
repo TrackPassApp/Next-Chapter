@@ -88,6 +88,10 @@ class UserProfile {
     List<String>? lookingFor,
     List<String>? interests,
     List<String>? lifeSituation,
+    List<String>? modes,
+    List<PromptAnswer>? prompts,
+    bool? isComplete,
+    int? completenessScore,
     bool? emailVerified,
     bool? phoneVerified,
     bool? selfieVerified,
@@ -109,6 +113,10 @@ class UserProfile {
       lookingFor: lookingFor ?? this.lookingFor,
       interests: interests ?? this.interests,
       lifeSituation: lifeSituation ?? this.lifeSituation,
+      modes: modes ?? this.modes,
+      prompts: prompts ?? this.prompts,
+      isComplete: isComplete ?? this.isComplete,
+      completenessScore: completenessScore ?? this.completenessScore,
       emailVerified: emailVerified ?? this.emailVerified,
       phoneVerified: phoneVerified ?? this.phoneVerified,
       selfieVerified: selfieVerified ?? this.selfieVerified,
@@ -117,6 +125,42 @@ class UserProfile {
       lastActive: lastActive ?? this.lastActive,
       isSuspended: isSuspended ?? this.isSuspended,
     );
+  }
+
+  /// Compute a 0–100 profile completeness score from the current profile.
+  /// Kept here so server-side score stays in sync with what the UI shows.
+  static int computeCompleteness({
+    required String firstName,
+    required DateTime? dateOfBirth,
+    required String city,
+    required String state,
+    required String gender,
+    required String relationshipStatus,
+    required String aboutMe,
+    required List<String> modes,
+    required List<String> lookingFor,
+    required List<String> interests,
+    required List<String> lifeSituation,
+    required List<PromptAnswer> prompts,
+    required int photoCount,
+  }) {
+    int s = 0;
+    if (firstName.trim().isNotEmpty) s += 5;
+    if (dateOfBirth != null) s += 5;
+    if (city.trim().isNotEmpty) s += 5;
+    if (state.trim().isNotEmpty) s += 5;
+    if (gender.trim().isNotEmpty) s += 5;
+    if (relationshipStatus.trim().isNotEmpty) s += 5;
+    if (aboutMe.trim().length >= 30) s += 10;
+    if (modes.isNotEmpty) s += 5;
+    if (lookingFor.isNotEmpty) s += 10;
+    if (interests.length >= 3) s += 10;
+    if (lifeSituation.isNotEmpty) s += 5;
+    if (prompts.where((p) => p.answer.trim().isNotEmpty).isNotEmpty) s += 10;
+    if (prompts.where((p) => p.answer.trim().isNotEmpty).length >= 3) s += 5;
+    if (photoCount >= 1) s += 10;
+    if (photoCount >= 3) s += 5;
+    return s.clamp(0, 100);
   }
 }
 

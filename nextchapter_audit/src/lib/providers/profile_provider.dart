@@ -81,6 +81,8 @@ class ProfileProvider extends ChangeNotifier {
     required List<String> interests,
     required List<String> lifeSituation,
     required bool isEmailVerified,
+    List<String> modes = const ['date'],
+    List<PromptAnswer> prompts = const [],
   }) async {
     if (SupabaseService.client == null) {
       _error = 'Cannot save — Supabase is not connected. '
@@ -94,6 +96,24 @@ class ProfileProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Compute completeness here so the DB score stays accurate.
+      final photoCount = _photoRecords.length;
+      final score = UserProfile.computeCompleteness(
+        firstName: firstName,
+        dateOfBirth: dateOfBirth,
+        city: city,
+        state: state,
+        gender: gender,
+        relationshipStatus: relationshipStatus,
+        aboutMe: aboutMe,
+        modes: modes,
+        lookingFor: lookingFor,
+        interests: interests,
+        lifeSituation: lifeSituation,
+        prompts: prompts,
+        photoCount: photoCount,
+      );
+
       // Upsert core profile row.
       final id = await ProfileRepository.instance.upsertProfile(
         userId: userId,
@@ -104,6 +124,9 @@ class ProfileProvider extends ChangeNotifier {
         gender: gender,
         relationshipStatus: relationshipStatus,
         aboutMe: aboutMe,
+        modes: modes,
+        isComplete: score >= 60,
+        completenessScore: score,
       );
 
       if (id == null) {
@@ -120,6 +143,7 @@ class ProfileProvider extends ChangeNotifier {
         ProfileRepository.instance.saveInterests(id, interests),
         ProfileRepository.instance.saveLookingFor(id, lookingFor),
         ProfileRepository.instance.saveLifeSituation(id, lifeSituation),
+        ProfileRepository.instance.savePrompts(id, prompts),
         ProfileRepository.instance.ensureVerificationStatus(id, emailVerified: isEmailVerified),
       ]);
 
