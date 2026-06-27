@@ -22,6 +22,16 @@
 -- Run this in Supabase SQL editor once.
 -- ============================================================================
 
+-- ── 0. Patch: resolve is_admin() overload ambiguity ────────────────────────
+-- Migration 001 created public.is_admin(uid uuid default auth.uid()).
+-- Migration 005 also created public.is_admin() (no-arg).
+-- Both match a zero-arg call, so Postgres raises:
+--   "function public.is_admin() is not unique"
+-- We drop the no-arg variant. The 1-arg version with default behaves
+-- identically when called with no args, so every admin RPC from 005 still
+-- works without modification.
+drop function if exists public.is_admin();
+
 -- ── 1. Table ────────────────────────────────────────────────────────────────
 create table if not exists public.verification_requests (
   id            uuid primary key default gen_random_uuid(),
