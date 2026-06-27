@@ -1,0 +1,12 @@
+Batch 1 verification — completed by E1 in Emergent container.
+Flutter 3.44.4 (Dart 3.12.2) on aarch64 Linux.
+
+Results:
+- flutter pub get: success (exit 0)
+- flutter analyze: 0 errors, 0 warnings, 51 info-level deprecation notices (all pre-existing, none in Batch 1 files)
+- AppConfig --define plumbing: verified (test A=OK, B=cleanly-refused, C=cleanly-refused)
+- flutter build web --release: success (exit 0); 3.3 MB main.dart.js produced
+- Built index.html title: "Next Chapter"
+- Built manifest name: "Next Chapter"
+- No "ConnectUp" string in any built artifact
+- Supabase URL and anon key baked into main.dart.js from --dart-define flags

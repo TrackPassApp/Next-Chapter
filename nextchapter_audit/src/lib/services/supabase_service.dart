@@ -3,8 +3,9 @@ import '../config/app_config.dart';
 
 /// Central access point for the Supabase client.
 ///
-/// Credentials are stored in lib/config/app_config.dart (gitignored).
-/// No credentials appear in any other source file.
+/// Credentials are injected at build time via --dart-define flags
+/// (SUPABASE_URL, SUPABASE_ANON_KEY). They are NOT stored in source.
+/// No credentials appear in any source file.
 class SupabaseService {
   SupabaseService._();
 
@@ -29,13 +30,17 @@ class SupabaseService {
 
   /// Human-readable explanation of why isConfigured is false (or null if OK).
   static String? get configurationError {
-    if (resolvedUrl.isEmpty) return 'supabaseUrl is empty in app_config.dart';
-    if (resolvedKey.isEmpty) return 'supabaseAnonKey is empty in app_config.dart';
+    if (resolvedUrl.isEmpty) {
+      return 'SUPABASE_URL is empty. Pass --dart-define=SUPABASE_URL=... at build time.';
+    }
+    if (resolvedKey.isEmpty) {
+      return 'SUPABASE_ANON_KEY is empty. Pass --dart-define=SUPABASE_ANON_KEY=... at build time.';
+    }
     final parts = resolvedKey.split('.');
     if (parts.length != 3) {
-      return 'supabaseAnonKey is malformed — expected 3 JWT segments '
+      return 'SUPABASE_ANON_KEY is malformed — expected 3 JWT segments '
           '(header.payload.signature), got ${parts.length}. '
-          'The key in app_config.dart is truncated.';
+          'The value passed via --dart-define is truncated.';
     }
     if (_initError != null) return 'Supabase.initialize() threw: $_initError';
     return null;
@@ -78,7 +83,7 @@ class SupabaseService {
       throw StateError(
         'Supabase client is unavailable.\n'
         'Reason: ${configurationError ?? _initError ?? "Unknown"}\n'
-        'Open lib/config/app_config.dart and fix supabaseUrl / supabaseAnonKey.',
+        'Pass valid --dart-define=SUPABASE_URL and --dart-define=SUPABASE_ANON_KEY at build time.',
       );
     }
     return c;
