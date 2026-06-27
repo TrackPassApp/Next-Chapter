@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../models/user_profile.dart';
+import '../providers/auth_provider.dart';
 import '../providers/browse_provider.dart';
 import '../theme/theme.dart';
 import '../widgets/common/profile_card.dart';
@@ -21,7 +23,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<BrowseProvider>().loadProfiles();
+      final userId = context.read<AuthProvider>().userId;
+      // Block list will be populated in Batch B6 once the user_blocks table lands.
+      context.read<BrowseProvider>().loadProfiles(currentUserId: userId);
     });
   }
 
@@ -132,6 +136,23 @@ class _BrowseScreenState extends State<BrowseScreen> {
                         onRemove: () => provider.setStateFilter(null),
                         colors: colors,
                       ),
+                    if (provider.cityFilter != null)
+                      _ActiveFilterChip(
+                        label: 'City: ${provider.cityFilter}',
+                        onRemove: () => provider.setCityFilter(null),
+                        colors: colors,
+                      ),
+                    if (provider.ageRange.start != 18 || provider.ageRange.end != 100)
+                      _ActiveFilterChip(
+                        label: '${provider.ageRange.start.round()}–${provider.ageRange.end.round()} yrs',
+                        onRemove: () => provider.setAgeRange(const RangeValues(18, 100)),
+                        colors: colors,
+                      ),
+                    ...provider.modeFilters.map((m) => _ActiveFilterChip(
+                          label: ModeOptions.label(m),
+                          onRemove: () => provider.toggleMode(m),
+                          colors: colors,
+                        )),
                     if (provider.verifiedOnly)
                       _ActiveFilterChip(
                         label: 'Verified Only',
@@ -139,15 +160,15 @@ class _BrowseScreenState extends State<BrowseScreen> {
                         colors: colors,
                       ),
                     ...provider.lookingForFilters.map((f) => _ActiveFilterChip(
-                      label: f,
-                      onRemove: () => provider.toggleLookingFor(f),
-                      colors: colors,
-                    )),
+                          label: f,
+                          onRemove: () => provider.toggleLookingFor(f),
+                          colors: colors,
+                        )),
                     ...provider.interestFilters.map((f) => _ActiveFilterChip(
-                      label: f,
-                      onRemove: () => provider.toggleInterest(f),
-                      colors: colors,
-                    )),
+                          label: f,
+                          onRemove: () => provider.toggleInterest(f),
+                          colors: colors,
+                        )),
                   ],
                 ),
               ),
@@ -157,7 +178,12 @@ class _BrowseScreenState extends State<BrowseScreen> {
             padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMd),
             child: Row(
               children: [
-                Text('${provider.profiles.length} profiles found', style: text.bodySmall),
+                Text(
+                  provider.isLoading
+                      ? 'Loading…'
+                      : '${provider.profiles.length} profile${provider.profiles.length == 1 ? "" : "s"} found',
+                  style: text.bodySmall,
+                ),
               ],
             ),
           ),
@@ -165,49 +191,77 @@ class _BrowseScreenState extends State<BrowseScreen> {
           Expanded(
             child: provider.isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : provider.profiles.isEmpty
+                : provider.error != null
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.search_off, size: AppTheme.spacingXxl, color: appColors.subtleText),
-                            const SizedBox(height: AppTheme.spacingMd),
-                            Text('No profiles match your filters', style: text.titleMedium),
-                            const SizedBox(height: AppTheme.spacingSm),
-                            TextButton(onPressed: provider.clearFilters, child: const Text('Clear Filters')),
-                          ],
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppTheme.spacingLg),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.error_outline, size: 64, color: appColors.danger),
+                              const SizedBox(height: AppTheme.spacingMd),
+                              Text(provider.error!, style: text.bodyMedium, textAlign: TextAlign.center),
+                              const SizedBox(height: AppTheme.spacingMd),
+                              ElevatedButton(
+                                onPressed: () {
+                                  final userId = context.read<AuthProvider>().userId;
+                                  provider.loadProfiles(currentUserId: userId);
+                                },
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
                         ),
                       )
-                    : CustomScrollView(
-                        slivers: [
-                          SliverPadding(
-                            padding: const EdgeInsets.all(AppTheme.spacingMd),
-                            sliver: SliverGrid(
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                                  if (index == 4 && provider.profiles.length > 4) {
-                                    return const AdPlaceholder(height: double.infinity);
-                                  }
-                                  final profileIndex = index > 4 ? index - 1 : index;
-                                  if (profileIndex >= provider.profiles.length) return null;
-                                  final profile = provider.profiles[profileIndex];
-                                  return ProfileCard(
-                                    profile: profile,
-                                    onTap: () => context.go('/profile/${profile.id}'),
-                                  );
-                                },
-                                childCount: provider.profiles.length + (provider.profiles.length > 4 ? 1 : 0),
-                              ),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: crossAxisCount,
-                                mainAxisSpacing: AppTheme.spacingMd,
-                                crossAxisSpacing: AppTheme.spacingMd,
-                                childAspectRatio: isMobile ? 0.62 : 0.68,
-                              ),
+                    : provider.profiles.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.search_off, size: AppTheme.spacingXxl, color: appColors.subtleText),
+                                const SizedBox(height: AppTheme.spacingMd),
+                                Text('No profiles match your filters', style: text.titleMedium),
+                                const SizedBox(height: AppTheme.spacingSm),
+                                TextButton(onPressed: provider.clearFilters, child: const Text('Clear Filters')),
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: () async {
+                              final userId = context.read<AuthProvider>().userId;
+                              await provider.loadProfiles(currentUserId: userId);
+                            },
+                            child: CustomScrollView(
+                              slivers: [
+                                SliverPadding(
+                                  padding: const EdgeInsets.all(AppTheme.spacingMd),
+                                  sliver: SliverGrid(
+                                    delegate: SliverChildBuilderDelegate(
+                                      (context, index) {
+                                        if (index == 4 && provider.profiles.length > 4) {
+                                          return const AdPlaceholder(height: double.infinity);
+                                        }
+                                        final profileIndex = index > 4 ? index - 1 : index;
+                                        if (profileIndex >= provider.profiles.length) return null;
+                                        final profile = provider.profiles[profileIndex];
+                                        return ProfileCard(
+                                          profile: profile,
+                                          onTap: () => context.go('/profile/${profile.id}'),
+                                        );
+                                      },
+                                      childCount: provider.profiles.length + (provider.profiles.length > 4 ? 1 : 0),
+                                    ),
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: crossAxisCount,
+                                      mainAxisSpacing: AppTheme.spacingMd,
+                                      crossAxisSpacing: AppTheme.spacingMd,
+                                      childAspectRatio: isMobile ? 0.62 : 0.68,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
           ),
         ],
       ),

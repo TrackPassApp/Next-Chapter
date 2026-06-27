@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/user_profile.dart';
 import '../../providers/browse_provider.dart';
-import '../../services/mock_data_service.dart';
 import '../../theme/theme.dart';
 
 class FilterSheet extends StatelessWidget {
@@ -40,10 +39,7 @@ class FilterSheet extends StatelessWidget {
                       },
                       child: const Text('Clear All'),
                     ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
                 ],
               ),
             ),
@@ -53,14 +49,30 @@ class FilterSheet extends StatelessWidget {
                 controller: scrollController,
                 padding: const EdgeInsets.all(AppTheme.spacingMd),
                 children: [
+                  _SectionTitle(title: 'I want to find people for…', text: text),
+                  const SizedBox(height: AppTheme.spacingSm),
+                  Wrap(
+                    spacing: AppTheme.spacingSm,
+                    runSpacing: AppTheme.spacingSm,
+                    children: ModeOptions.all.map((m) => FilterChip(
+                      label: Text(ModeOptions.label(m)),
+                      selected: provider.modeFilters.contains(m),
+                      onSelected: (_) => provider.toggleMode(m),
+                      selectedColor: colors.primaryContainer,
+                      checkmarkColor: colors.primary,
+                    )).toList(),
+                  ),
+                  const SizedBox(height: AppTheme.spacingLg),
+
                   _SectionTitle(title: 'Location', text: text),
                   const SizedBox(height: AppTheme.spacingSm),
                   DropdownButtonFormField<String>(
                     value: provider.stateFilter,
                     decoration: const InputDecoration(labelText: 'State', prefixIcon: Icon(Icons.map_outlined)),
+                    isExpanded: true,
                     items: [
                       const DropdownMenuItem(value: null, child: Text('All States')),
-                      ...MockDataService.usStates.map((s) => DropdownMenuItem(value: s, child: Text(s))),
+                      ...UsStates.fullNames.map((s) => DropdownMenuItem(value: s, child: Text(s))),
                     ],
                     onChanged: provider.setStateFilter,
                   ),
@@ -71,6 +83,7 @@ class FilterSheet extends StatelessWidget {
                     onChanged: provider.setCityFilter,
                   ),
                   const SizedBox(height: AppTheme.spacingLg),
+
                   _SectionTitle(title: 'Age Range', text: text),
                   const SizedBox(height: AppTheme.spacingSm),
                   RangeSlider(
@@ -82,7 +95,11 @@ class FilterSheet extends StatelessWidget {
                       provider.ageRange.start.round().toString(),
                       provider.ageRange.end.round().toString(),
                     ),
-                    onChanged: provider.setAgeRange,
+                    onChanged: (r) {
+                      // Only push to server when the user lets go — onChanged
+                      // fires continuously, so debounce via onChangeEnd below.
+                    },
+                    onChangeEnd: (r) => provider.setAgeRange(r),
                   ),
                   Center(
                     child: Text(
@@ -91,6 +108,7 @@ class FilterSheet extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: AppTheme.spacingLg),
+
                   _SectionTitle(title: 'Looking For', text: text),
                   const SizedBox(height: AppTheme.spacingSm),
                   Wrap(
@@ -105,6 +123,7 @@ class FilterSheet extends StatelessWidget {
                     )).toList(),
                   ),
                   const SizedBox(height: AppTheme.spacingLg),
+
                   _SectionTitle(title: 'Interests', text: text),
                   const SizedBox(height: AppTheme.spacingSm),
                   Wrap(
@@ -119,6 +138,7 @@ class FilterSheet extends StatelessWidget {
                     )).toList(),
                   ),
                   const SizedBox(height: AppTheme.spacingLg),
+
                   _SectionTitle(title: 'Verification', text: text),
                   const SizedBox(height: AppTheme.spacingSm),
                   SwitchListTile(

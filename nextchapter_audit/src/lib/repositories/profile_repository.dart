@@ -44,23 +44,81 @@ class ProfileRepository {
     return _assembleProfile(profileId, row, db);
   }
 
-  /// Load all active profiles for the browse screen.
-  Future<List<UserProfile>> fetchAllProfiles({String? excludeUserId}) async {
+  /// Load profiles for the browse screen with server-side filters.
+  ///
+  /// Filtering applied at the database layer:
+  ///   - excludes suspended and deleted rows
+  ///   - excludes incomplete profiles UNLESS they belong to [currentUserId]
+  ///   - optional [stateName] equality match
+  ///   - optional [ageMin]/[ageMax] via date_of_birth window
+  ///   - optional [modes] overlap (any mode in [modes])
+  ///   - optional [excludedProfileIds] (e.g., users I've blocked)
+  ///   - hard [limit] on rows returned (default 200 — fine for Beta)
+  ///
+  /// Note: interests / looking_for / life_situation filtering still happens
+  /// in-memory on the caller side because those live in child tables.
+  Future<List<UserProfile>> fetchAllProfiles({
+    String? currentUserId,
+    String? stateName,
+    int? ageMin,
+    int? ageMax,
+    List<String> modes = const [],
+    List<String> excludedProfileIds = const [],
+    int limit = 200,
+  }) async {
     final db = SupabaseService.client;
     if (db == null) return [];
 
-    var query = db
+    dynamic query = db
         .from('profiles')
         .select()
         .eq('is_suspended', false)
         .eq('is_deleted', false);
 
-    final rows = await query;
+    // Show incomplete profiles only if they belong to the current user.
+    if (currentUserId != null) {
+      query = query.or('is_complete.eq.true,user_id.eq.$currentUserId');
+    } else {
+      query = query.eq('is_complete', true);
+    }
+
+    if (stateName != null && stateName.isNotEmpty) {
+      query = query.eq('state', stateName);
+    }
+
+    // Convert age range → date_of_birth window.
+    if (ageMin != null || ageMax != null) {
+      final now = DateTime.now();
+      if (ageMin != null) {
+        // Max DoB so that age >= ageMin.
+        final maxDob = DateTime(now.year - ageMin, now.month, now.day);
+        query = query.lte('date_of_birth', maxDob.toIso8601String().split('T').first);
+      }
+      if (ageMax != null) {
+        // Min DoB so that age <= ageMax.
+        final minDob = DateTime(now.year - ageMax - 1, now.month, now.day);
+        query = query.gte('date_of_birth', minDob.toIso8601String().split('T').first);
+      }
+    }
+
+    if (modes.isNotEmpty) {
+      // overlaps operator → "modes && ARRAY['date','friend']"
+      query = query.overlaps('modes', modes);
+    }
+
+    if (excludedProfileIds.isNotEmpty) {
+      // not.in.(uuid1,uuid2)
+      final csv = excludedProfileIds.join(',');
+      query = query.not('id', 'in', '($csv)');
+    }
+
+    final rows = await query
+        .order('completeness_score', ascending: false)
+        .order('updated_at', ascending: false)
+        .limit(limit);
 
     final List<UserProfile> result = [];
-    for (final row in rows) {
-      // Skip the logged-in user's own profile from browse results.
-      if (excludeUserId != null && row['user_id'] == excludeUserId) continue;
+    for (final row in (rows as List)) {
       final profileId = row['id'] as String;
       final profile = await _assembleProfile(profileId, row, db);
       result.add(profile);

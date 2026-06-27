@@ -40,18 +40,24 @@ class ProfileCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  CachedNetworkImage(
-                    imageUrl: profile.photoUrls.first,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => Container(
+                  if (profile.photoUrls.isNotEmpty)
+                    CachedNetworkImage(
+                      imageUrl: profile.photoUrls.first,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(
+                        color: colors.surfaceContainerHighest,
+                        child: Icon(Icons.person, size: AppTheme.iconLg, color: appColors.subtleText),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        color: colors.surfaceContainerHighest,
+                        child: Icon(Icons.person, size: AppTheme.iconLg, color: appColors.subtleText),
+                      ),
+                    )
+                  else
+                    Container(
                       color: colors.surfaceContainerHighest,
                       child: Icon(Icons.person, size: AppTheme.iconLg, color: appColors.subtleText),
                     ),
-                    errorWidget: (_, __, ___) => Container(
-                      color: colors.surfaceContainerHighest,
-                      child: Icon(Icons.person, size: AppTheme.iconLg, color: appColors.subtleText),
-                    ),
-                  ),
                   Positioned(
                     top: AppTheme.spacingSm,
                     right: AppTheme.spacingSm,

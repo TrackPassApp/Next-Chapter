@@ -21,7 +21,7 @@ Pivot: Build the app in **12 feature batches**. NO step-by-step testing. Run **o
 - [x] **B1** Security + DB foundation — admin role hardening, RLS, 002 migration ✅
 - [x] **B2** Onboarding Wizard — 9-step `/welcome` flow ✅
 - [x] **B3** Profiles & Photos — photo upload/delete, prompts, modes, completeness ring, real Profile Detail ✅ (2026-02)
-- [ ] **B4** Browse + filters (real Supabase queries; replace MockDataService)
+- [x] **B4** Browse + filters — real Supabase queries, modes filter, hide incomplete/suspended/deleted, server-side state/age/modes filtering ✅ (2026-02)
 - [ ] **B5** Messaging (conversations, threads, Supabase realtime)
 - [ ] **B6** Block & report enforcement
 - [ ] **B7** Admin (real users list, suspend/delete, reports queue, metrics)
