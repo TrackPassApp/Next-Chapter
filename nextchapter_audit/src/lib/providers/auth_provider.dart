@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/app_config.dart';
 import '../services/supabase_service.dart';
 
 /// Authentication result with an optional error message for the UI.
@@ -137,6 +138,10 @@ class AuthProvider extends ChangeNotifier {
       final res = await SupabaseService.db.auth.signUp(
         email: email.trim(),
         password: password,
+        // Where the Supabase confirmation email link should redirect to.
+        // When empty, Supabase uses the project's Site URL dashboard setting.
+        emailRedirectTo:
+            AppConfig.appUrl.isEmpty ? null : AppConfig.appUrl,
         data: {
           'date_of_birth': dob.toIso8601String(),
         },
