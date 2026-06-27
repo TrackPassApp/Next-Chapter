@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/messages_provider.dart';
@@ -9,6 +11,13 @@ import 'theme/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Defensive bootstrap for sandboxed preview environments where the
+  // browser locale tag or third-party font CDN may be unavailable.
+  // Safe to keep in production; safe to remove when running locally.
+  Intl.defaultLocale = 'en_US';
+  GoogleFonts.config.allowRuntimeFetching = false;
+
   await SupabaseService.initialize();
   runApp(const MyApp());
 }
