@@ -24,7 +24,7 @@ Pivot: Build the app in **12 feature batches**. NO step-by-step testing. Run **o
 - [x] **B4** Browse + filters — real Supabase queries, modes filter, hide incomplete/suspended/deleted, server-side state/age/modes filtering ✅ (2026-02)
 - [x] **B5** Messaging — real Supabase conversations, persistent threads, realtime, unread counts, mark-read ✅ (2026-02)
 - [x] **B6** Block & report enforcement — user_blocks table, RLS-driven conversation hiding, real reports to Supabase, My Profile avatar in app bar ✅ (2026-02)
-- [ ] **B7** Admin (real users list, suspend/delete, reports queue, metrics)
+- [x] **B7** Admin Dashboard — real users/reports/verification/log/metrics, web-only, all writes via SECURITY DEFINER RPCs that audit to moderation_log ✅ (2026-02)
 - [ ] **B8** Verification UI (status + placeholder screens)
 - [ ] **B9** Demo community seed (6 SQL profiles + sample photos)
 - [ ] **B10** Privacy, safety, account deletion pipeline

@@ -1,205 +1,96 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../services/mock_data_service.dart';
 import '../theme/theme.dart';
+import '../widgets/admin/admin_metrics_tab.dart';
+import '../widgets/admin/admin_users_tab.dart';
+import '../widgets/admin/admin_reports_tab.dart';
+import '../widgets/admin/admin_verification_tab.dart';
+import '../widgets/admin/admin_log_tab.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final text = theme.textTheme;
-    final appColors = theme.extension<AppColorsExtension>()!;
-    final width = MediaQuery.sizeOf(context).width;
-    final isMobile = width < 600;
-
-    // Defense-in-depth admin guard. The router also blocks /admin for
-    // non-admins, but if anything ever bypasses that (deep link, tests,
-    // future refactor), this screen still refuses to render.
     final auth = context.watch<AuthProvider>();
-    if (!auth.isAdmin) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Forbidden')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppTheme.spacingLg),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.lock_outline, size: 48, color: appColors.danger),
-                const SizedBox(height: AppTheme.spacingMd),
-                Text('Admin access required.',
-                    style: text.titleMedium, textAlign: TextAlign.center),
-                const SizedBox(height: AppTheme.spacingSm),
-                Text(
-                  'This screen is restricted to platform administrators.',
-                  style: text.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppTheme.spacingLg),
-                ElevatedButton(
-                  onPressed: () => context.go(auth.isLoggedIn ? '/browse' : '/'),
-                  child: const Text('Go back'),
-                ),
-              ],
-            ),
-          ),
-        ),
+    final theme = Theme.of(context);
+    final text = theme.textTheme;
+    final colors = theme.colorScheme;
+    final appColors = theme.extension<AppColorsExtension>()!;
+
+    // Web-only: show a friendly block on mobile.
+    if (!kIsWeb) {
+      return _GuardScreen(
+        title: 'Desktop required',
+        message: 'The Admin Dashboard is web-only. Please open Next Chapter in a desktop browser.',
+        icon: Icons.computer_outlined,
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Dashboard'),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: AppTheme.spacingMd),
-            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingSm, vertical: AppTheme.spacingXs),
-            decoration: BoxDecoration(
-              color: appColors.danger.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-            ),
-            child: Text('ADMIN', style: text.labelSmall?.copyWith(color: appColors.danger, fontWeight: FontWeight.w700)),
+    // Defence-in-depth admin guard. The router already redirects non-admins,
+    // but if this screen ever renders without the role, refuse.
+    if (!auth.isAdmin) {
+      return _GuardScreen(
+        title: 'Forbidden',
+        message: 'This screen is restricted to platform administrators.',
+        icon: Icons.lock_outline,
+      );
+    }
+
+    return DefaultTabController(
+      length: 5,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Row(
+            children: [
+              const Text('Admin Dashboard'),
+              const SizedBox(width: AppTheme.spacingMd),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingSm, vertical: 2),
+                decoration: BoxDecoration(
+                  color: appColors.danger.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                  border: Border.all(color: appColors.danger.withOpacity(0.3)),
+                ),
+                child: Text('ADMIN', style: text.labelSmall?.copyWith(color: appColors.danger, fontWeight: FontWeight.w700)),
+              ),
+            ],
           ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppTheme.spacingMd),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: AppTheme.maxContentWidth),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Platform Metrics', style: text.titleMedium),
-                const SizedBox(height: AppTheme.spacingMd),
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: isMobile ? 2 : 4,
-                  mainAxisSpacing: AppTheme.spacingMd,
-                  crossAxisSpacing: AppTheme.spacingMd,
-                  childAspectRatio: 1.5,
-                  children: [
-                    _MetricCard(label: 'Total Users', value: '${MockDataService.profiles.length}', icon: Icons.people_outline, color: colors.primary, colors: colors, text: text),
-                    _MetricCard(label: 'Active Today', value: '${MockDataService.profiles.where((p) => p.isOnline).length}', icon: Icons.circle, color: appColors.online, colors: colors, text: text),
-                    _MetricCard(label: 'Reports', value: '${MockDataService.reports.length}', icon: Icons.flag_outlined, color: appColors.warning, colors: colors, text: text),
-                    _MetricCard(label: 'Verified', value: '${MockDataService.profiles.where((p) => p.hasAnyVerification).length}', icon: Icons.verified_outlined, color: appColors.verified, colors: colors, text: text),
-                  ],
-                ),
-                const SizedBox(height: AppTheme.spacingLg),
-                Text('Recent Reports', style: text.titleMedium),
-                const SizedBox(height: AppTheme.spacingMd),
-                ...MockDataService.reports.map((report) => Container(
-                  margin: const EdgeInsets.only(bottom: AppTheme.spacingSm),
-                  padding: const EdgeInsets.all(AppTheme.spacingMd),
-                  decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                    border: Border.all(color: colors.outlineVariant.withOpacity(0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(AppTheme.spacingSm),
-                        decoration: BoxDecoration(
-                          color: appColors.warning.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-                        ),
-                        child: Icon(Icons.flag, color: appColors.warning, size: AppTheme.iconMd),
-                      ),
-                      const SizedBox(width: AppTheme.spacingMd),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(report.reportedUserName, style: text.titleSmall),
-                            Text('Reason: ${report.reason}', style: text.bodySmall),
-                            if (report.details != null) Text(report.details!, style: text.bodySmall?.copyWith(color: appColors.subtleText), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingSm, vertical: AppTheme.spacingXs),
-                            decoration: BoxDecoration(
-                              color: appColors.warning.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-                            ),
-                            child: Text('Pending', style: text.labelSmall?.copyWith(color: appColors.warning)),
-                          ),
-                          const SizedBox(height: AppTheme.spacingSm),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: Icon(Icons.check_circle_outline, color: appColors.success, size: AppTheme.iconMd),
-                                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report resolved'))),
-                                tooltip: 'Resolve',
-                              ),
-                              IconButton(
-                                icon: Icon(Icons.person_off_outlined, color: appColors.danger, size: AppTheme.iconMd),
-                                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User suspended'))),
-                                tooltip: 'Suspend User',
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                )),
-                const SizedBox(height: AppTheme.spacingLg),
-                Text('Users', style: text.titleMedium),
-                const SizedBox(height: AppTheme.spacingMd),
-                ...MockDataService.profiles.map((profile) => Container(
-                  margin: const EdgeInsets.only(bottom: AppTheme.spacingSm),
-                  decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                    border: Border.all(color: colors.outlineVariant.withOpacity(0.2)),
-                  ),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: colors.primaryContainer,
-                      child: Text(profile.firstName[0], style: text.titleSmall?.copyWith(color: colors.primary)),
-                    ),
-                    title: Text('${profile.firstName}, ${profile.age}', style: text.titleSmall),
-                    subtitle: Text('${profile.city}, ${profile.state} • ${profile.verificationCount}/4 verified', style: text.bodySmall),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (v) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$v: ${profile.firstName}')));
-                      },
-                      itemBuilder: (_) => [
-                        const PopupMenuItem(value: 'Suspend', child: Text('Suspend')),
-                        const PopupMenuItem(value: 'Delete', child: Text('Delete')),
-                        const PopupMenuItem(value: 'View Reports', child: Text('View Reports')),
-                      ],
-                    ),
-                  ),
-                )),
-                const SizedBox(height: AppTheme.spacingLg),
-                Container(
-                  padding: const EdgeInsets.all(AppTheme.spacingMd),
-                  decoration: BoxDecoration(
-                    color: colors.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.campaign_outlined, color: appColors.subtleText),
-                      const SizedBox(width: AppTheme.spacingMd),
-                      Expanded(child: Text('Ad management coming soon', style: text.bodySmall?.copyWith(color: appColors.subtleText))),
-                    ],
-                  ),
-                ),
-              ],
+          actions: [
+            TextButton.icon(
+              onPressed: () => context.go('/browse'),
+              icon: const Icon(Icons.exit_to_app, size: 18),
+              label: const Text('Exit admin'),
             ),
+            const SizedBox(width: AppTheme.spacingMd),
+          ],
+          bottom: TabBar(
+            isScrollable: false,
+            labelColor: colors.primary,
+            unselectedLabelColor: colors.onSurfaceVariant,
+            indicatorColor: colors.primary,
+            tabs: const [
+              Tab(icon: Icon(Icons.dashboard_outlined), text: 'Overview'),
+              Tab(icon: Icon(Icons.people_outline), text: 'Users'),
+              Tab(icon: Icon(Icons.flag_outlined), text: 'Reports'),
+              Tab(icon: Icon(Icons.verified_outlined), text: 'Verification'),
+              Tab(icon: Icon(Icons.history), text: 'Moderation Log'),
+            ],
+          ),
+        ),
+        body: const Padding(
+          padding: EdgeInsets.all(AppTheme.spacingMd),
+          child: TabBarView(
+            children: [
+              AdminMetricsTab(),
+              AdminUsersTab(),
+              AdminReportsTab(),
+              AdminVerificationTab(),
+              AdminLogTab(),
+            ],
           ),
         ),
       ),
@@ -207,35 +98,41 @@ class AdminScreen extends StatelessWidget {
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  final String label;
-  final String value;
+class _GuardScreen extends StatelessWidget {
+  final String title;
+  final String message;
   final IconData icon;
-  final Color color;
-  final ColorScheme colors;
-  final TextTheme text;
-
-  const _MetricCard({required this.label, required this.value, required this.icon, required this.color, required this.colors, required this.text});
+  const _GuardScreen({required this.title, required this.message, required this.icon});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.spacingMd),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-        border: Border.all(color: colors.outlineVariant.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: AppTheme.iconMd),
-          const Spacer(),
-          Text(value, style: text.headlineSmall?.copyWith(color: color)),
-          Text(label, style: text.labelSmall),
-        ],
+    final theme = Theme.of(context);
+    final text = theme.textTheme;
+    final appColors = theme.extension<AppColorsExtension>()!;
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppTheme.spacingLg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 48, color: appColors.subtleText),
+              const SizedBox(height: AppTheme.spacingMd),
+              Text(title, style: text.titleMedium, textAlign: TextAlign.center),
+              const SizedBox(height: AppTheme.spacingSm),
+              Text(message, style: text.bodySmall, textAlign: TextAlign.center),
+              const SizedBox(height: AppTheme.spacingLg),
+              ElevatedButton(
+                onPressed: () => context.go('/browse'),
+                child: const Text('Go back'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
+
+// End of admin shell.
