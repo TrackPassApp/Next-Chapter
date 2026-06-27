@@ -34,6 +34,8 @@ class _MyAppState extends State<MyApp> {
 
     // Load profile whenever the auth state changes (login, session restore, logout).
     _authProvider.addListener(_onAuthChanged);
+    // Bind the messaging provider to the user's profile id once it's loaded.
+    _profileProvider.addListener(_onProfileChanged);
   }
 
   void _onAuthChanged() {
@@ -42,12 +44,23 @@ class _MyAppState extends State<MyApp> {
       _profileProvider.loadProfile(userId);
     } else {
       _profileProvider.clear();
+      _messagesProvider.clear();
+    }
+  }
+
+  void _onProfileChanged() {
+    final profileId = _profileProvider.profileId;
+    if (profileId != null && _messagesProvider.myProfileId != profileId) {
+      _messagesProvider.bindProfile(profileId);
+    } else if (profileId == null && _messagesProvider.myProfileId != null) {
+      _messagesProvider.clear();
     }
   }
 
   @override
   void dispose() {
     _authProvider.removeListener(_onAuthChanged);
+    _profileProvider.removeListener(_onProfileChanged);
     _authProvider.dispose();
     _profileProvider.dispose();
     _messagesProvider.dispose();

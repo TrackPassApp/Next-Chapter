@@ -22,7 +22,7 @@ Pivot: Build the app in **12 feature batches**. NO step-by-step testing. Run **o
 - [x] **B2** Onboarding Wizard — 9-step `/welcome` flow ✅
 - [x] **B3** Profiles & Photos — photo upload/delete, prompts, modes, completeness ring, real Profile Detail ✅ (2026-02)
 - [x] **B4** Browse + filters — real Supabase queries, modes filter, hide incomplete/suspended/deleted, server-side state/age/modes filtering ✅ (2026-02)
-- [ ] **B5** Messaging (conversations, threads, Supabase realtime)
+- [x] **B5** Messaging — real Supabase conversations, persistent threads, realtime, unread counts, mark-read ✅ (2026-02)
 - [ ] **B6** Block & report enforcement
 - [ ] **B7** Admin (real users list, suspend/delete, reports queue, metrics)
 - [ ] **B8** Verification UI (status + placeholder screens)

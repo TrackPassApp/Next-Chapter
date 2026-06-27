@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/messages_provider.dart';
+import '../providers/profile_provider.dart';
 import '../theme/theme.dart';
 import '../widgets/chat/message_bubble.dart';
 import '../widgets/chat/chat_input.dart';
@@ -19,25 +20,34 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MessagesProvider>().loadMessages(widget.conversationId);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final messages = context.read<MessagesProvider>();
+      final myProfileId = context.read<ProfileProvider>().profileId;
+      if (myProfileId != null && messages.myProfileId == null) {
+        await messages.bindProfile(myProfileId);
+      }
+      await messages.openConversation(widget.conversationId);
+      _scrollToBottom();
     });
   }
 
   @override
   void dispose() {
+    // Detach realtime + clear state for this conversation. We do this here
+    // rather than in deactivate so the listener survives quick rebuilds.
+    final messages = context.read<MessagesProvider>();
+    messages.closeActiveConversation();
     _scrollController.dispose();
     super.dispose();
   }
 
   void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
   }
 
   @override
@@ -45,7 +55,11 @@ class _ChatScreenState extends State<ChatScreen> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final text = theme.textTheme;
-    final provider = context.watch<MessagesProvider>();
+    final messages = context.watch<MessagesProvider>();
+    final myProfileId = messages.myProfileId;
+
+    // Auto-scroll on new message ticks.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
     return Scaffold(
       appBar: AppBar(
@@ -70,23 +84,39 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
               Expanded(
-                child: provider.isLoading
+                child: messages.loadingMessages
                     ? const Center(child: CircularProgressIndicator())
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(AppTheme.spacingMd),
-                        itemCount: provider.currentMessages.length,
-                        itemBuilder: (_, i) {
-                          final msg = provider.currentMessages[i];
-                          final isMe = msg.senderId == 'me';
-                          return MessageBubble(message: msg, isMe: isMe);
-                        },
-                      ),
+                    : messages.currentMessages.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(AppTheme.spacingLg),
+                              child: Text(
+                                'Say hi — your conversation starts here.',
+                                style: text.bodyMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(AppTheme.spacingMd),
+                            itemCount: messages.currentMessages.length,
+                            itemBuilder: (_, i) {
+                              final msg = messages.currentMessages[i];
+                              final isMe = msg.senderId == myProfileId;
+                              return MessageBubble(message: msg, isMe: isMe);
+                            },
+                          ),
               ),
               ChatInput(
-                onSend: (text) {
-                  provider.sendMessage(text);
-                  Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+                onSend: (txt) async {
+                  final ok = await messages.sendMessage(txt);
+                  if (!ok && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Could not send — check your connection.')),
+                    );
+                  }
+                  _scrollToBottom();
                 },
               ),
             ],

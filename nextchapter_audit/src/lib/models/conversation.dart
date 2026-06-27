@@ -20,6 +20,26 @@ class Conversation {
     this.isRequest = false,
     this.isOnline = false,
   });
+
+  Conversation copyWith({
+    String? lastMessage,
+    DateTime? lastMessageTime,
+    int? unreadCount,
+    bool? isOnline,
+    bool? isRequest,
+  }) {
+    return Conversation(
+      id: id,
+      otherUserId: otherUserId,
+      otherUserName: otherUserName,
+      otherUserPhoto: otherUserPhoto,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastMessageTime: lastMessageTime ?? this.lastMessageTime,
+      unreadCount: unreadCount ?? this.unreadCount,
+      isRequest: isRequest ?? this.isRequest,
+      isOnline: isOnline ?? this.isOnline,
+    );
+  }
 }
 
 class ChatMessage {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
+import '../providers/messages_provider.dart';
 import '../providers/profile_provider.dart';
 import '../repositories/profile_repository.dart';
 import '../services/supabase_service.dart';
@@ -387,7 +388,7 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 700),
                     child: ElevatedButton.icon(
-                      onPressed: () => context.go('/messages/c_${profile.id}'),
+                      onPressed: () => _openConversation(profile),
                       icon: const Icon(Icons.chat_bubble_outline),
                       label: Text('Message ${profile.firstName} — Free'),
                     ),
@@ -396,6 +397,34 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
               ),
             ),
     );
+  }
+
+  Future<void> _openConversation(UserProfile profile) async {
+    final messages = context.read<MessagesProvider>();
+    final myProfileId = context.read<ProfileProvider>().profileId;
+    if (myProfileId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Finish your profile first to start a conversation.')),
+      );
+      return;
+    }
+
+    if (messages.myProfileId == null) {
+      await messages.bindProfile(myProfileId);
+    }
+
+    // Use first selected mode as the conversation's mode (defaults to 'date').
+    final mode = profile.modes.isNotEmpty ? profile.modes.first : 'date';
+    final convId = await messages.startConversationWith(profile.id, mode: mode);
+
+    if (!mounted) return;
+    if (convId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not start conversation. Please try again.')),
+      );
+      return;
+    }
+    context.go('/messages/$convId');
   }
 
   void _onMenu(String value, UserProfile profile, AppColorsExtension appColors, ColorScheme colors) {

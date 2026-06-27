@@ -7,12 +7,14 @@ class ConversationTile extends StatelessWidget {
   final Conversation conversation;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final bool enableSwipeDelete;
 
   const ConversationTile({
     super.key,
     required this.conversation,
     required this.onTap,
     required this.onDelete,
+    this.enableSwipeDelete = false,
   });
 
   @override
@@ -22,17 +24,7 @@ class ConversationTile extends StatelessWidget {
     final text = theme.textTheme;
     final appColors = theme.extension<AppColorsExtension>()!;
 
-    return Dismissible(
-      key: Key(conversation.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: AppTheme.spacingMd),
-        color: appColors.danger,
-        child: Icon(Icons.delete_outline, color: colors.onError),
-      ),
-      onDismissed: (_) => onDelete(),
-      child: ListTile(
+    final tile = ListTile(
         onTap: onTap,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppTheme.spacingMd,
@@ -43,7 +35,12 @@ class ConversationTile extends StatelessWidget {
             CircleAvatar(
               radius: AppTheme.avatarSm / 2 + 4,
               backgroundColor: colors.surfaceContainerHighest,
-              backgroundImage: CachedNetworkImageProvider(conversation.otherUserPhoto),
+              backgroundImage: conversation.otherUserPhoto.isNotEmpty
+                  ? CachedNetworkImageProvider(conversation.otherUserPhoto)
+                  : null,
+              child: conversation.otherUserPhoto.isEmpty
+                  ? Icon(Icons.person, color: appColors.subtleText)
+                  : null,
             ),
             if (conversation.isOnline)
               Positioned(
@@ -97,7 +94,21 @@ class ConversationTile extends StatelessWidget {
             ],
           ],
         ),
+      );
+
+    if (!enableSwipeDelete) return tile;
+
+    return Dismissible(
+      key: Key(conversation.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: AppTheme.spacingMd),
+        color: appColors.danger,
+        child: Icon(Icons.delete_outline, color: colors.onError),
       ),
+      onDismissed: (_) => onDelete(),
+      child: tile,
     );
   }
 
