@@ -4,6 +4,12 @@ import 'package:provider/provider.dart';
 import '../providers/messages_provider.dart';
 import '../theme/theme.dart';
 
+/// Main app shell — persistent bottom navigation across:
+///   0 Browse     1 Activity (coming soon)
+///   2 Messages   3 My Profile     4 Settings
+///
+/// Single-click navigation, current page highlighted, designed to be
+/// expanded later without touching screens.
 class AppShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
   const AppShell({super.key, required this.navigationShell});
@@ -19,11 +25,24 @@ class AppShell extends StatelessWidget {
       body: navigationShell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (index) => navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex),
+        onDestinationSelected: (index) => navigationShell.goBranch(
+          index,
+          initialLocation: index == navigationShell.currentIndex,
+        ),
         backgroundColor: colors.surface,
         indicatorColor: colors.primaryContainer,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: [
-          const NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore), label: 'Browse'),
+          const NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Browse',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.favorite_outline),
+            selectedIcon: Icon(Icons.favorite),
+            label: 'Activity',
+          ),
           NavigationDestination(
             icon: Badge(
               isLabelVisible: msgProvider.unreadCount > 0,
@@ -34,7 +53,16 @@ class AppShell extends StatelessWidget {
             selectedIcon: const Icon(Icons.chat_bubble),
             label: 'Messages',
           ),
-          const NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
+          const NavigationDestination(
+            icon: Icon(Icons.account_circle_outlined),
+            selectedIcon: Icon(Icons.account_circle),
+            label: 'My Profile',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
+          ),
         ],
       ),
     );

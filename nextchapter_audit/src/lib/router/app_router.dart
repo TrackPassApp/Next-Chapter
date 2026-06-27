@@ -15,7 +15,9 @@ import '../screens/profile_detail_screen.dart';
 import '../screens/messages_screen.dart';
 import '../screens/chat_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/activity_screen.dart';
 import '../screens/admin_screen.dart';
+import '../screens/my_profile_screen.dart';
 import '../screens/privacy_screen.dart';
 import '../screens/terms_screen.dart';
 import '../screens/app_shell.dart';
@@ -109,16 +111,16 @@ class AppRouter {
             ),
           ]),
           StatefulShellBranch(routes: [
-            GoRoute(
-              path: '/inbox',
-              builder: (context, _) => const MessagesScreen(),
-            ),
+            GoRoute(path: '/activity', builder: (_, __) => const ActivityScreen()),
           ]),
           StatefulShellBranch(routes: [
-            GoRoute(
-              path: '/settings',
-              builder: (_, __) => const SettingsScreen(),
-            ),
+            GoRoute(path: '/inbox', builder: (_, __) => const MessagesScreen()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/me', builder: (_, __) => const MyProfileScreen()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
           ]),
         ],
       ),

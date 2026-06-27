@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/messages_provider.dart';
 import '../providers/profile_provider.dart';
+import '../services/supabase_service.dart';
 import '../theme/theme.dart';
 import '../widgets/common/my_avatar_leading.dart';
 
@@ -40,6 +42,19 @@ class SettingsScreen extends StatelessWidget {
                   _SettingsTile(icon: Icons.block_outlined, title: 'Blocked Users', onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No blocked users')));
                   }),
+                ],
+                colors: colors,
+                text: text,
+              ),
+              const SizedBox(height: AppTheme.spacingMd),
+              _SettingsSection(
+                title: 'Demo & Beta Tools',
+                children: [
+                  _SettingsTile(
+                    icon: Icons.auto_awesome_outlined,
+                    title: 'Populate demo conversations',
+                    onTap: () => _seedDemoConversations(context, appColors),
+                  ),
                 ],
                 colors: colors,
                 text: text,
@@ -89,6 +104,28 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (_) => _DeleteAccountDialog(colors: colors, text: text, appColors: appColors),
     );
+  }
+
+  Future<void> _seedDemoConversations(BuildContext context, AppColorsExtension appColors) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final db = SupabaseService.client;
+    if (db == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('Supabase is not connected.')));
+      return;
+    }
+    try {
+      final n = await db.rpc('seed_demo_conversations_for_me');
+      if (!context.mounted) return;
+      // Force the inbox to refresh so the seeded conversations show up immediately.
+      await context.read<MessagesProvider>().loadConversations();
+      messenger.showSnackBar(SnackBar(
+        content: Text(n is int && n > 0
+            ? 'Seeded $n demo conversation${n == 1 ? "" : "s"}. Open Messages to see them.'
+            : 'Demo conversations are already in your inbox.'),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Could not seed demo conversations: $e')));
+    }
   }
 }
 
