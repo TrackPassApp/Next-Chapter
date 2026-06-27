@@ -67,9 +67,6 @@ class AuthProvider extends ChangeNotifier {
   bool get isAdmin {
     if (_isMockMode) return _mockIsAdmin;
     final role = _user?.appMetadata['role'];
-    // TEMP DIAGNOSTIC: prints to browser console. Remove once Test 2 passes.
-    // ignore: avoid_print
-    print('[isAdmin] _user=${_user?.email} appMetadata=${_user?.appMetadata} role=$role');
     return role == 'admin' ||
         role == 'super_admin' ||
         role == 'moderator';

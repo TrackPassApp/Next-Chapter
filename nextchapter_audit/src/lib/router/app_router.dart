@@ -25,11 +25,7 @@ class AppRouter {
     refreshListenable: authProvider,
     redirect: (context, state) {
       // While the initial session is being restored from storage, show nothing.
-      if (authProvider.isLoading) {
-        // ignore: avoid_print
-        print('[router] loc=${state.matchedLocation} -> SKIP (loading)');
-        return null;
-      }
+      if (authProvider.isLoading) return null;
 
       final loggedIn = authProvider.isLoggedIn;
       final loc = state.matchedLocation;
@@ -39,38 +35,20 @@ class AppRouter {
       // It is restricted below to debug builds or signed-in admins.
       final isPublic = loc == '/' || loc == '/privacy' || loc == '/terms' || isAuthRoute;
 
-      // TEMP DIAGNOSTIC — remove once Test 2 passes.
-      // ignore: avoid_print
-      print('[router] loc=$loc loggedIn=$loggedIn isAdmin=${authProvider.isAdmin} isPublic=$isPublic');
-
       // Standard logged-out gating.
-      if (!loggedIn && !isPublic && loc != '/diagnostics') {
-        // ignore: avoid_print
-        print('[router] -> /login (logged out + not public)');
-        return '/login';
-      }
-      if (loggedIn && (loc == '/' || isAuthRoute)) {
-        // ignore: avoid_print
-        print('[router] -> /browse (logged in on landing or auth route)');
-        return '/browse';
-      }
+      if (!loggedIn && !isPublic && loc != '/diagnostics') return '/login';
+      if (loggedIn && (loc == '/' || isAuthRoute)) return '/browse';
 
       // Admin-only gating. Defense-in-depth — AdminScreen also self-guards.
       if (loc == '/admin' && !authProvider.isAdmin) {
-        // ignore: avoid_print
-        print('[router] -> ${loggedIn ? "/browse" : "/login"} (admin guard, isAdmin=false)');
         return loggedIn ? '/browse' : '/login';
       }
 
       // Diagnostics route: debug builds OR signed-in admins only.
       if (loc == '/diagnostics' && !kDebugMode && !authProvider.isAdmin) {
-        // ignore: avoid_print
-        print('[router] -> ${loggedIn ? "/browse" : "/"} (diagnostics guard)');
         return loggedIn ? '/browse' : '/';
       }
 
-      // ignore: avoid_print
-      print('[router] -> (no redirect) stay on $loc');
       return null;
     },
     routes: [
