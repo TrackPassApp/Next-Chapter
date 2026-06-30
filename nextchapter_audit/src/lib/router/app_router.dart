@@ -42,11 +42,13 @@ class AppRouter {
       if (!loggedIn && !isPublic && loc != '/diagnostics') return '/login';
       if (loggedIn && (loc == '/' || isAuthRoute)) return '/browse';
 
-      // Logged-in users with an incomplete profile go to the wizard.
-      // We read profileProvider via Provider.of(context, listen:false) to
-      // avoid wiring it into refreshListenable (auth changes are what drive
-      // re-evaluation; profile completion changes trigger a manual go).
-      if (loggedIn && loc != '/welcome' && loc != '/admin' && loc != '/diagnostics') {
+      // Logged-in users with an incomplete profile are funneled to the
+      // onboarding wizard ONLY when they try to use the social surfaces
+      // (browse / inbox / activity). They can still reach their own profile,
+      // settings, verification, edit-profile, etc. — so the app never feels
+      // like a dead-end while they're filling things in.
+      const _gatedForIncomplete = {'/browse', '/inbox', '/activity'};
+      if (loggedIn && _gatedForIncomplete.contains(loc)) {
         try {
           final pp = Provider.of<ProfileProvider>(context, listen: false);
           if (pp.profile != null && !pp.profile!.isComplete) {
@@ -85,12 +87,6 @@ class AppRouter {
       GoRoute(path: '/admin', builder: (_, __) => const AdminScreen()),
       GoRoute(path: '/welcome', builder: (_, __) => const OnboardingScreen()),
       GoRoute(path: '/diagnostics', builder: (_, __) => const DiagnosticsScreen()),
-      GoRoute(path: '/verification', builder: (_, __) => const VerificationStatusScreen()),
-      GoRoute(path: '/edit-profile', builder: (_, __) => const EditProfileScreen()),
-      GoRoute(
-        path: '/profile/:id',
-        builder: (_, state) => ProfileDetailScreen(profileId: state.pathParameters['id']!),
-      ),
       GoRoute(
         path: '/messages/:id',
         builder: (context, state) => ChangeNotifierProvider.value(
@@ -108,6 +104,12 @@ class AppRouter {
                 create: (_) => BrowseProvider()..loadProfiles(),
                 child: const BrowseScreen(),
               ),
+              routes: [
+                GoRoute(
+                  path: 'profile/:id',
+                  builder: (_, state) => ProfileDetailScreen(profileId: state.pathParameters['id']!),
+                ),
+              ],
             ),
           ]),
           StatefulShellBranch(routes: [
@@ -117,13 +119,28 @@ class AppRouter {
             GoRoute(path: '/inbox', builder: (_, __) => const MessagesScreen()),
           ]),
           StatefulShellBranch(routes: [
-            GoRoute(path: '/me', builder: (_, __) => const MyProfileScreen()),
+            GoRoute(
+              path: '/me',
+              builder: (_, __) => const MyProfileScreen(),
+              routes: [
+                GoRoute(path: 'edit', builder: (_, __) => const EditProfileScreen()),
+                GoRoute(path: 'verification', builder: (_, __) => const VerificationStatusScreen()),
+              ],
+            ),
           ]),
           StatefulShellBranch(routes: [
             GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
           ]),
         ],
       ),
+      // Top-level fallbacks for legacy / direct links (kept so existing
+      // context.go('/profile/:id') etc. doesn't break).
+      GoRoute(
+        path: '/profile/:id',
+        builder: (_, state) => ProfileDetailScreen(profileId: state.pathParameters['id']!),
+      ),
+      GoRoute(path: '/verification', builder: (_, __) => const VerificationStatusScreen()),
+      GoRoute(path: '/edit-profile', builder: (_, __) => const EditProfileScreen()),
     ],
   );
 }
