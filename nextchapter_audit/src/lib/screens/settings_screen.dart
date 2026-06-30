@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../config/app_config.dart';
 import '../providers/auth_provider.dart';
 import '../providers/messages_provider.dart';
 import '../providers/profile_provider.dart';
@@ -92,6 +94,46 @@ class SettingsScreen extends StatelessWidget {
                 colors: colors,
                 text: text,
               ),
+              const SizedBox(height: AppTheme.spacingLg),
+              // Build label — lets the user verify the deployed bundle is
+              // actually the latest one. Tap to copy.
+              Center(
+                child: GestureDetector(
+                  onTap: () {
+                    Clipboard.setData(const ClipboardData(text: AppConfig.buildLabel));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Build label copied to clipboard')),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.spacingMd,
+                      vertical: AppTheme.spacingSm,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                      border: Border.all(color: colors.outlineVariant),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified_outlined,
+                            size: AppTheme.iconSm, color: appColors.subtleText),
+                        const SizedBox(width: AppTheme.spacingSm),
+                        Text(
+                          'Build: ${AppConfig.buildLabel}',
+                          style: text.bodySmall?.copyWith(
+                            color: appColors.subtleText,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppTheme.spacingMd),
             ],
           ),
         ),

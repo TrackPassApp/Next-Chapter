@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../config/app_config.dart';
 import '../models/user_profile.dart';
 import '../providers/block_provider.dart';
 import '../providers/messages_provider.dart';
@@ -141,7 +142,27 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isOwn ? 'My Profile' : 'Profile'),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(isOwn ? 'My Profile' : 'Profile'),
+            const SizedBox(width: AppTheme.spacingSm),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: colors.primaryContainer,
+                borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+              ),
+              child: Text(
+                AppConfig.buildLabel,
+                style: text.labelSmall?.copyWith(
+                  color: colors.onPrimaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
         actions: [
           if (isOwn)
             IconButton(
