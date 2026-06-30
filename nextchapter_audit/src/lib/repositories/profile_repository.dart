@@ -318,16 +318,41 @@ class ProfileRepository {
       gender: row['gender'] as String? ?? '',
       relationshipStatus: row['relationship_status'] as String? ?? '',
       aboutMe: row['about_me'] as String? ?? '',
-      photoUrls: photos.map((p) => p['display_url'] as String).toList(),
-      interests: interests.map((i) => i['interest'] as String).toList(),
-      lookingFor: lookingFor.map((l) => l['looking_for'] as String).toList(),
-      lifeSituation: lifeSit.map((s) => s['life_situation'] as String).toList(),
+      // Defensive null filtering on every child-row pluck. A single NULL
+      // value here (e.g. a profile_photos row with no display_url) used to
+      // throw a TypeError at runtime which propagated up the widget tree
+      // and silently blanked the Profile Detail body in release mode.
+      photoUrls: photos
+          .map((p) => p['display_url']?.toString())
+          .whereType<String>()
+          .where((u) => u.isNotEmpty)
+          .toList(),
+      interests: interests
+          .map((i) => i['interest']?.toString())
+          .whereType<String>()
+          .toList(),
+      lookingFor: lookingFor
+          .map((l) => l['looking_for']?.toString())
+          .whereType<String>()
+          .toList(),
+      lifeSituation: lifeSit
+          .map((s) => s['life_situation']?.toString())
+          .whereType<String>()
+          .toList(),
       modes: (row['modes'] as List?)?.map((m) => m.toString()).toList() ?? const ['date'],
-      prompts: promptsRows.map<PromptAnswer>((r) => PromptAnswer(
-        promptKey: r['prompt_key'] as String,
-        answer: r['answer'] as String,
-        position: (r['position'] as num?)?.toInt() ?? 0,
-      )).toList(),
+      prompts: promptsRows
+          .map<PromptAnswer?>((r) {
+            final key = r['prompt_key']?.toString();
+            final ans = r['answer']?.toString();
+            if (key == null || key.isEmpty || ans == null) return null;
+            return PromptAnswer(
+              promptKey: key,
+              answer: ans,
+              position: (r['position'] as num?)?.toInt() ?? 0,
+            );
+          })
+          .whereType<PromptAnswer>()
+          .toList(),
       isComplete: row['is_complete'] as bool? ?? false,
       completenessScore: (row['completeness_score'] as num?)?.toInt() ?? 0,
       emailVerified: verRow?['email_verified'] as bool? ?? false,
