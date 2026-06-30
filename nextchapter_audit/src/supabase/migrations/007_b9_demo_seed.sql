@@ -60,7 +60,7 @@ begin
     -- correspond to any real plaintext. Avoids depending on pgcrypto's
     -- crypt()/gen_salt() (which lives in the `extensions` schema on Supabase
     -- and isn't always on the search_path).
-    '$2a$10$DemoAccountNoLoginXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+    '$2a$10$DemoAccountNoLoginXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
     now(),
     jsonb_build_object('demo', true),
     jsonb_build_object('demo', true),
