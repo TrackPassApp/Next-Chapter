@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -134,10 +135,23 @@ class AppRouter {
         ],
       ),
       // Top-level fallbacks for legacy / direct links (kept so existing
-      // context.go('/profile/:id') etc. doesn't break).
+      // context.go('/profile/:id') etc. doesn't break). The detail screen
+      // itself validates that :id is a UUID — anything else (e.g. an old
+      // numeric '/profile/2' bookmark) is bounced safely back to /browse.
       GoRoute(
         path: '/profile/:id',
-        builder: (_, state) => ProfileDetailScreen(profileId: state.pathParameters['id']!),
+        redirect: (_, state) {
+          final id = state.pathParameters['id'] ?? '';
+          // Forward UUIDs into the canonical in-shell route so the bottom
+          // navigation stays mounted.
+          final uuidRe = RegExp(
+            r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+          );
+          if (uuidRe.hasMatch(id)) return '/browse/profile/$id';
+          // Legacy mock numeric ids (id='2', '7' …) just go home.
+          return '/browse';
+        },
+        builder: (_, __) => const SizedBox.shrink(),
       ),
       GoRoute(path: '/verification', builder: (_, __) => const VerificationStatusScreen()),
       GoRoute(path: '/edit-profile', builder: (_, __) => const EditProfileScreen()),

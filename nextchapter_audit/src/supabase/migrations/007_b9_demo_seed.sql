@@ -156,7 +156,7 @@ begin
   insert into public.profile_photos (profile_id, storage_path, display_url, display_order) values
     (sarah_id,   'demo/sarah-1.jpg',   'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=900&q=80', 0),
     (sarah_id,   'demo/sarah-2.jpg',   'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=900&q=80', 1),
-    (sarah_id,   'demo/sarah-3.jpg',   'https://images.unsplash.com/photo-1546961342-1e3c5f6f7b8a?w=900&q=80', 2),
+    (sarah_id,   'demo/sarah-3.jpg',   'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=900&q=80', 2),
     (lisa_id,    'demo/lisa-1.jpg',    'https://images.unsplash.com/photo-1554151228-14d9def656e4?w=900&q=80', 0),
     (lisa_id,    'demo/lisa-2.jpg',    'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=900&q=80', 1),
     (maria_id,   'demo/maria-1.jpg',   'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=900&q=80', 0),

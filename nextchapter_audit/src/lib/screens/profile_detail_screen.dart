@@ -28,6 +28,13 @@ class ProfileDetailScreen extends StatefulWidget {
 }
 
 class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
+  // Supabase profile.id is a UUID. Anything else is a legacy/mock id and
+  // must never be sent to the database — it always fails. We catch it here
+  // and bounce the user back to Browse instead of showing a broken page.
+  static final RegExp _uuidRe = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
   UserProfile? _profile;
   bool _loading = true;
   String? _error;
@@ -36,6 +43,18 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
   @override
   void initState() {
     super.initState();
+    // Guard against legacy numeric ids like /profile/2 from old bundles or
+    // bookmarks. Bounce out of the page before we ever query Supabase.
+    if (!_uuidRe.hasMatch(widget.profileId)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('That profile link is outdated. Returning to Browse.')),
+        );
+        context.go('/browse');
+      });
+      return;
+    }
     _load();
   }
 
@@ -51,16 +70,6 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
       _error = null;
     });
 
-    // Own profile shortcut — provider already has it.
-    final own = context.read<ProfileProvider>().profile;
-    if (own != null && own.id == widget.profileId) {
-      setState(() {
-        _profile = own;
-        _loading = false;
-      });
-      return;
-    }
-
     if (!SupabaseService.isConfigured || SupabaseService.client == null) {
       setState(() {
         _loading = false;
@@ -70,6 +79,10 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
     }
 
     try {
+      // Always re-fetch from Supabase. We deliberately do NOT use the
+      // ProfileProvider cache here because that cache is initialised at
+      // login and may be missing photos/prompts/interests the user added
+      // later. A fresh fetch via _assembleProfile guarantees the full body.
       final p = await ProfileRepository.instance.fetchProfileById(widget.profileId);
       if (!mounted) return;
       setState(() {
@@ -81,7 +94,7 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Could not load profile.';
+        _error = 'Could not load profile: ${e.toString()}';
       });
     }
   }
@@ -171,17 +184,26 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
                   child: currentPhoto == null
-                      ? Container(
-                          color: colors.surfaceContainerHighest,
-                          child: Icon(Icons.person, size: 96, color: appColors.subtleText),
+                      ? _NoPhotoPlaceholder(
+                          colors: colors,
+                          appColors: appColors,
+                          text: text,
+                          firstName: profile.firstName,
+                          isOwn: isOwn,
+                          onAdd: isOwn ? () => context.push('/me/edit') : null,
                         )
                       : CachedNetworkImage(
                           imageUrl: currentPhoto,
                           fit: BoxFit.cover,
                           placeholder: (_, __) => Container(color: colors.surfaceContainerHighest),
-                          errorWidget: (_, __, ___) => Container(
-                            color: colors.surfaceContainerHighest,
-                            child: Icon(Icons.broken_image_outlined, size: 56, color: appColors.subtleText),
+                          errorWidget: (_, __, ___) => _NoPhotoPlaceholder(
+                            colors: colors,
+                            appColors: appColors,
+                            text: text,
+                            firstName: profile.firstName,
+                            isOwn: isOwn,
+                            onAdd: isOwn ? () => context.push('/me/edit') : null,
+                            broken: true,
                           ),
                         ),
                 ),
@@ -257,6 +279,14 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
                   id: profile.idVerified,
                   expanded: true,
                 ),
+              ] else if (isOwn) ...[
+                const SizedBox(height: AppTheme.spacingMd),
+                _EmptyHint(
+                  icon: Icons.verified_outlined,
+                  text: 'You have no verifications yet.',
+                  actionLabel: 'Get verified',
+                  onAction: () => context.push('/me/verification'),
+                ),
               ],
 
               if (profile.modes.isNotEmpty) ...[
@@ -273,55 +303,90 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
               _Section(
                 title: 'About Me',
                 icon: Icons.person_outline,
-                child: Text(profile.aboutMe.isEmpty ? '—' : profile.aboutMe, style: text.bodyLarge),
+                child: profile.aboutMe.isNotEmpty
+                    ? Text(profile.aboutMe, style: text.bodyLarge)
+                    : _EmptyHint(
+                        icon: Icons.edit_note_outlined,
+                        text: isOwn
+                            ? 'Tell people who you are — even one line helps.'
+                            : 'No bio yet.',
+                        actionLabel: isOwn ? 'Add bio' : null,
+                        onAction: isOwn ? () => context.push('/me/edit') : null,
+                      ),
               ),
 
-              if (profile.prompts.isNotEmpty)
-                _Section(
-                  title: 'Their Story',
-                  icon: Icons.format_quote_outlined,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: profile.prompts.map((p) => Container(
-                      margin: const EdgeInsets.only(bottom: AppTheme.spacingSm),
-                      padding: const EdgeInsets.all(AppTheme.spacingMd),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                        border: Border.all(color: colors.outlineVariant),
-                      ),
-                      child: Column(
+              _Section(
+                title: isOwn ? 'My Story' : 'Their Story',
+                icon: Icons.format_quote_outlined,
+                child: profile.prompts.isNotEmpty
+                    ? Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(p.promptKey, style: text.labelMedium?.copyWith(color: colors.primary, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 4),
-                          Text(p.answer, style: text.bodyLarge),
-                        ],
+                        children: profile.prompts.map((p) => Container(
+                          margin: const EdgeInsets.only(bottom: AppTheme.spacingSm),
+                          padding: const EdgeInsets.all(AppTheme.spacingMd),
+                          decoration: BoxDecoration(
+                            color: colors.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                            border: Border.all(color: colors.outlineVariant),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(p.promptKey, style: text.labelMedium?.copyWith(color: colors.primary, fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 4),
+                              Text(p.answer, style: text.bodyLarge),
+                            ],
+                          ),
+                        )).toList(),
+                      )
+                    : _EmptyHint(
+                        icon: Icons.format_quote_outlined,
+                        text: isOwn
+                            ? 'Answer a few prompts to add personality.'
+                            : 'No prompts yet.',
+                        actionLabel: isOwn ? 'Add prompts' : null,
+                        onAction: isOwn ? () => context.push('/me/edit') : null,
                       ),
-                    )).toList(),
-                  ),
-                ),
+              ),
 
-              if (profile.lookingFor.isNotEmpty)
-                _Section(
-                  title: 'Looking For',
-                  icon: Icons.favorite_outline,
-                  child: _chips(profile.lookingFor, colors.primaryContainer),
-                ),
+              _Section(
+                title: 'Looking For',
+                icon: Icons.favorite_outline,
+                child: profile.lookingFor.isNotEmpty
+                    ? _chips(profile.lookingFor, colors.primaryContainer)
+                    : _EmptyHint(
+                        icon: Icons.favorite_outline,
+                        text: isOwn ? 'Tell people what you\'re open to.' : 'Not specified.',
+                        actionLabel: isOwn ? 'Set preferences' : null,
+                        onAction: isOwn ? () => context.push('/me/edit') : null,
+                      ),
+              ),
 
-              if (profile.interests.isNotEmpty)
-                _Section(
-                  title: 'Interests',
-                  icon: Icons.interests_outlined,
-                  child: _chips(profile.interests, colors.secondaryContainer),
-                ),
+              _Section(
+                title: 'Interests',
+                icon: Icons.interests_outlined,
+                child: profile.interests.isNotEmpty
+                    ? _chips(profile.interests, colors.secondaryContainer)
+                    : _EmptyHint(
+                        icon: Icons.interests_outlined,
+                        text: isOwn ? 'Add interests so others can connect.' : 'No interests listed.',
+                        actionLabel: isOwn ? 'Add interests' : null,
+                        onAction: isOwn ? () => context.push('/me/edit') : null,
+                      ),
+              ),
 
-              if (profile.lifeSituation.isNotEmpty)
-                _Section(
-                  title: 'Life Situation',
-                  icon: Icons.timeline_outlined,
-                  child: _chips(profile.lifeSituation, colors.tertiaryContainer),
-                ),
+              _Section(
+                title: 'Life Situation',
+                icon: Icons.timeline_outlined,
+                child: profile.lifeSituation.isNotEmpty
+                    ? _chips(profile.lifeSituation, colors.tertiaryContainer)
+                    : _EmptyHint(
+                        icon: Icons.timeline_outlined,
+                        text: isOwn ? 'Share where you are in life.' : 'Not specified.',
+                        actionLabel: isOwn ? 'Add details' : null,
+                        onAction: isOwn ? () => context.push('/me/edit') : null,
+                      ),
+              ),
 
               _Section(
                 title: 'Details',
@@ -526,6 +591,124 @@ class _ModeBadge extends StatelessWidget {
         border: Border.all(color: colors.primary.withOpacity(0.4)),
       ),
       child: Text(label, style: text.labelMedium?.copyWith(color: colors.onPrimaryContainer, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+/// Initials + soft gradient when a profile has no usable photo. Lifted out
+/// of the AspectRatio so we can reuse it for both "no photo at all" and
+/// "photo URL 404" cases without breaking the layout.
+class _NoPhotoPlaceholder extends StatelessWidget {
+  final ColorScheme colors;
+  final AppColorsExtension appColors;
+  final TextTheme text;
+  final String firstName;
+  final bool isOwn;
+  final bool broken;
+  final VoidCallback? onAdd;
+  const _NoPhotoPlaceholder({
+    required this.colors,
+    required this.appColors,
+    required this.text,
+    required this.firstName,
+    required this.isOwn,
+    this.broken = false,
+    this.onAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = firstName.isNotEmpty ? firstName[0].toUpperCase() : '?';
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            colors.primaryContainer,
+            colors.surfaceContainerHighest,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 96, height: 96,
+            decoration: BoxDecoration(
+              color: colors.primary.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(initial, style: text.displayMedium?.copyWith(
+              color: colors.primary,
+              fontWeight: FontWeight.bold,
+            )),
+          ),
+          const SizedBox(height: AppTheme.spacingSm),
+          Text(
+            broken ? 'Photo unavailable' : 'No photo yet',
+            style: text.bodyMedium?.copyWith(color: appColors.subtleText),
+          ),
+          if (isOwn && onAdd != null) ...[
+            const SizedBox(height: AppTheme.spacingSm),
+            ElevatedButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+              label: const Text('Add photo'),
+              style: ElevatedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Soft, consistent empty-state used inside profile sections so the page
+/// never looks blank — even for a brand-new user with no prompts/interests.
+class _EmptyHint extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  const _EmptyHint({
+    required this.icon,
+    required this.text,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final tt = theme.textTheme;
+    final appColors = theme.extension<AppColorsExtension>()!;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppTheme.spacingMd),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: AppTheme.iconMd, color: appColors.subtleText),
+          const SizedBox(width: AppTheme.spacingSm),
+          Expanded(
+            child: Text(text, style: tt.bodyMedium?.copyWith(color: appColors.subtleText)),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(width: AppTheme.spacingSm),
+            TextButton(onPressed: onAction, child: Text(actionLabel!)),
+          ],
+        ],
+      ),
     );
   }
 }
