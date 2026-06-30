@@ -1,0 +1,47 @@
+{
+  "summary": "File-level verification of supabase migration 007_b9_demo_seed.sql (pgcrypto-dependency fix). 33/35 pytest checks pass. Critical finding: the bcrypt-shaped placeholder string written to auth.users.encrypted_password is 65 characters long, NOT 60 — violating both the user's explicit stated invariant ('exactly 60 characters long') and the canonical bcrypt shape `$2[axyb]$NN$<53 chars>` (60 total). All other invariants verified: no unqualified crypt(/gen_salt( calls remain, no CREATE EXTENSION pgcrypto, SQL is well-formed (balanced $$ and parens, sqlparse-parseable, semicolon-terminated), migration is idempotent (auth.users uses `on conflict (id) do nothing`; all 5 profile_* subtables use `on conflict do nothing`; verification_status uses `on conflict (profile_id) do nothing`; profiles use lookup-then-update pattern), gen_random_uuid() remains in seed_demo_conversations_for_me (Postgres 13+ built-in, no pgcrypto needed), all 6 demo uuids passed to _seed_demo_user() match those referenced in the RPC's user_id IN(...) list, and `grant execute ... to authenticated` is present. Flutter side untouched: `flutter analyze --no-fatal-infos` on /app/nextchapter_audit/src reports 0 errors / 0 warnings / 78 accepted info-level deprecations.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/app/nextchapter_audit/src/supabase/migrations/007_b9_demo_seed.sql line 63",
+        "issue": "Placeholder bcrypt string `$2a$10$DemoAccountNoLoginXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` is 65 characters long, not 60. Standard bcrypt is exactly 60 chars: `$2[axyb]$NN$` (7-char header) + 53-char body. The current string has a 58-char body (18 chars 'DemoAccountNoLogin' + 40 X's). The user's own testing criteria explicitly require length==60. Fix: drop 5 X's so the body is 53 chars total (e.g. 18 char 'DemoAccountNoLogin' + 35 X's → `$2a$10$DemoAccountNoLoginXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`, total 60).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_migration_007_b9_demo_seed.py",
+    "/app/test_reports/pytest/pytest_results_007.xml"
+  ],
+  "action_items": [
+    "Trim the placeholder on line 63 of 007_b9_demo_seed.sql from 65 chars to exactly 60 chars by removing 5 of the trailing X's. Suggested replacement (60 chars): `$2a$10$DemoAccountNoLoginXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` — i.e. 7-char `$2a$10$` header + 18-char 'DemoAccountNoLogin' + 35 X's = 60. This is a one-character-count edit, no functional logic change. Although Supabase's `auth.users.encrypted_password` is TEXT and won't reject 65-char strings at INSERT time, conforming to the canonical 60-char bcrypt shape avoids any future surprises (gotrue defensively validates shape on a few code paths) and matches the user's stated invariant."
+  ],
+  "critical_code_review_comments": [
+    "Line 63 placeholder is 65 chars instead of 60. The body after `$2a$10$` is 58 chars (DemoAccountNoLogin = 18 + 40 X's); a real bcrypt hash has exactly 53 chars after the header (22-char base64 salt + 31-char base64 hash). User's testing criteria explicitly demand len==60. HIGH priority for the 'shape correctness' contract, LOW priority for actually-blocking-the-migration (auth.users.encrypted_password column is plain TEXT in Supabase's gotrue schema and will accept any length at insert time).",
+    "pgcrypto-dependency removal is otherwise complete and correct: zero unqualified `crypt(`/`gen_salt(` tokens anywhere in the file (verified with comment-stripped regex), no CREATE EXTENSION calls. `gen_random_uuid()` correctly retained — it is a Postgres 13+ built-in living in pg_catalog, NOT pgcrypto, and works without any extension.",
+    "Idempotency is fully wired: auth.users insert → `on conflict (id) do nothing`; profile_photos / profile_prompts / profile_interests / profile_looking_for / profile_life_situation all → `on conflict do nothing`; verification_status → `on conflict (profile_id) do nothing`; profiles handled via `select id into new_profile_id from public.profiles where user_id = in_user_id` then branch (insert if null, update otherwise). Both functions use `create or replace function`. Re-running the migration multiple times is safe.",
+    "SQL well-formedness verified: sqlparse parses ≥3 top-level statements (helper function, DO block, RPC function — the GRANT is parsed as part of the RPC group), $$ delimiters balanced (4 occurrences, even), parentheses balanced after stripping line-comments and single-quoted strings (including '' escapes), file terminates on `$$;` then a `grant execute ... ;` (the last non-empty line ends with `;`).",
+    "Demo uuid set is consistent across the file: all 6 uuids (00000000-0000-4000-8000-00000000000{1..6}) are both passed as the first arg to `public._seed_demo_user('<uuid>', ...)` inside the DO block AND listed in the `user_id in (...)` lookup inside `seed_demo_conversations_for_me`. No orphaned demo or missing demo — the seeded conversations will find all 6 partners.",
+    "`grant execute on function public.seed_demo_conversations_for_me() to authenticated;` is present on line 282 so signed-in real users can call the inbox-seeder.",
+    "Flutter side: 0 errors, 0 warnings, 78 info-level deprecations (withOpacity → withValues, RadioGroup migration, FormField.value → initialValue, plus a few new since iteration 1 — was 77, now 78, but all info-level and accepted by the user per iteration 1)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_migration_007_b9_demo_seed.py"
+  ],
+  "success_rate": {
+    "backend": "94% (33/35 file-level checks passed; 2 failures both stem from the same 65-vs-60 char placeholder issue)",
+    "frontend": "N/A (frontend testing explicitly skipped per request; flutter analyze: 0 errors / 0 warnings / 78 accepted info deprecations)"
+  },
+  "test_credentials": "Not applicable — no DB / API access required for this task.",
+  "seed_data_creation": "None.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All checks except the placeholder-length are green. After main agent trims the placeholder to exactly 60 chars (suggested string in action_items), re-run `pytest /app/backend/tests/test_migration_007_b9_demo_seed.py -v` and update EXPECTED_PLACEHOLDER in the test file to the new 60-char string. All 35 checks should then pass. No DB available in this environment; user will paste-and-run in the Supabase SQL editor.",
+  "rca of the issue": "Root cause of the migration error reported by user (`ERROR: 42883: function gen_salt(unknown) does not exist`): Supabase installs the `pgcrypto` extension into the `extensions` schema rather than `public`, and the SQL Editor's default search_path does not include `extensions`. So `gen_salt('bf')` and `crypt(...)` calls inside the security-definer helper `_seed_demo_user()` (which sets `search_path = public`) cannot resolve. The fix correctly side-steps pgcrypto entirely by hardcoding a bcrypt-shaped placeholder into encrypted_password — auth.users.encrypted_password is a plain TEXT column whose shape is only validated by gotrue at login time, and demo accounts are never logged into. Residual issue introduced by the fix: the chosen placeholder is 65 chars instead of the canonical 60 (18-char 'DemoAccountNoLogin' + 40 X's after `$2a$10$`, total 65). Trim 5 X's to make it 60. The migration will still run successfully even at 65 chars (TEXT column accepts any length), so this is a contract-correctness issue, not a blocking SQL error."
+}

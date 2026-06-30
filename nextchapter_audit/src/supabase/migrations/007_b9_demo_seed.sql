@@ -54,7 +54,13 @@ begin
   )
   values (
     in_user_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-    in_email, crypt('demo-password-' || in_user_id::text, gen_salt('bf')),
+    in_email,
+    -- Demo accounts have no usable password. The 60-char placeholder is
+    -- bcrypt-shaped so the column constraint is satisfied, but it doesn't
+    -- correspond to any real plaintext. Avoids depending on pgcrypto's
+    -- crypt()/gen_salt() (which lives in the `extensions` schema on Supabase
+    -- and isn't always on the search_path).
+    '$2a$10$DemoAccountNoLoginXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
     now(),
     jsonb_build_object('demo', true),
     jsonb_build_object('demo', true),
