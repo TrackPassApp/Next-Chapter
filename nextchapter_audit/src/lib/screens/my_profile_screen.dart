@@ -32,7 +32,7 @@ class MyProfileScreen extends StatelessWidget {
     }
     if (profile.profileId == null) {
       return _placeholder(text, colors, 'Set up your profile to get started',
-          actionLabel: 'Create profile', onAction: () => context.go('/edit-profile'));
+          actionLabel: 'Create profile', onAction: () => context.go('/me/edit'));
     }
     if (profile.profile != null && !profile.profile!.isComplete) {
       return _placeholder(text, colors, 'Finish your profile to see how others see you',

@@ -56,13 +56,15 @@ class MyAvatarLeading extends StatelessWidget {
       return;
     }
     if (profileId == null) {
-      context.go('/edit-profile');
+      context.go('/me/edit');
       return;
     }
     if (!isComplete) {
       context.go('/welcome');
       return;
     }
-    context.go('/profile/$profileId');
+    // Open the My Profile branch (which renders the public profile detail
+    // with Edit instead of Message/Block/Report).
+    context.go('/me');
   }
 }

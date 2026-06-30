@@ -208,7 +208,7 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
                     IconButton(
                       tooltip: 'Edit profile',
                       icon: const Icon(Icons.edit_outlined),
-                      onPressed: () => context.push('/edit-profile').then((_) => _load()),
+                      onPressed: () => context.push('/me/edit').then((_) => _load()),
                     ),
                   ]
                 : [
@@ -412,7 +412,7 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
                         if (!profile.isComplete) {
                           context.go('/welcome');
                         } else {
-                          context.push('/edit-profile').then((_) => _load());
+                          context.push('/me/edit').then((_) => _load());
                         }
                       },
                       icon: const Icon(Icons.edit_outlined),

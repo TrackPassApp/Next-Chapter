@@ -34,10 +34,10 @@ class SettingsScreen extends StatelessWidget {
                 title: 'Account',
                 children: [
                   _SettingsTile(icon: Icons.person_outline, title: 'Edit Profile', onTap: () {
-                    context.go('/edit-profile');
+                    context.go('/me/edit');
                   }),
                   _SettingsTile(icon: Icons.verified_user_outlined, title: 'Verification Status', onTap: () {
-                    context.push('/verification');
+                    context.go('/me/verification');
                   }),
                   _SettingsTile(icon: Icons.block_outlined, title: 'Blocked Users', onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No blocked users')));

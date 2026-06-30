@@ -263,7 +263,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                                         final profile = provider.profiles[profileIndex];
                                         return ProfileCard(
                                           profile: profile,
-                                          onTap: () => context.go('/profile/${profile.id}'),
+                                          onTap: () => context.go('/browse/profile/${profile.id}'),
                                         );
                                       },
                                       childCount: provider.profiles.length + (provider.profiles.length > 4 ? 1 : 0),

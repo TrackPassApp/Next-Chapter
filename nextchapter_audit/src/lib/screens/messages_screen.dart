@@ -99,7 +99,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                               const SizedBox(height: AppTheme.spacingMd),
                               Text('Finish your profile to start messaging.', style: text.bodyMedium, textAlign: TextAlign.center),
                               const SizedBox(height: AppTheme.spacingMd),
-                              ElevatedButton(onPressed: () => context.go('/edit-profile'), child: const Text('Set up profile')),
+                              ElevatedButton(onPressed: () => context.go('/me/edit'), child: const Text('Set up profile')),
                             ],
                           ),
                         ),
