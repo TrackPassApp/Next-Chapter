@@ -76,6 +76,11 @@ class SettingsScreen extends StatelessWidget {
                 title: 'Danger Zone',
                 children: [
                   _SettingsTile(
+                    icon: Icons.bug_report_outlined,
+                    title: 'Run Diagnostics',
+                    onTap: () => context.push('/diagnostics'),
+                  ),
+                  _SettingsTile(
                     icon: Icons.logout,
                     title: 'Log Out',
                     color: appColors.warning,

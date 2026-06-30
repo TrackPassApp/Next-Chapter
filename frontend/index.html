@@ -12,9 +12,6 @@
         }
       } catch (_) {}
     })();
-
-    // On EVERY page load, proactively rip out any old service worker + caches.
-    // Belt + braces with the self-uninstalling SW.
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function (regs) {
         regs.forEach(function (r) { r.unregister(); });
@@ -33,9 +30,9 @@
   <meta name="apple-mobile-web-app-title" content="Next Chapter">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="icon" type="image/png" href="favicon.png"/>
-  <title>Next Chapter — Build 20260630160418</title>
-  <meta name="x-app-build" content="ProfileFix-2026-06-30">
-  <link rel="manifest" href="manifest.json?v=20260630160418">
+  <title>Next Chapter — FullRepair 20260630163623</title>
+  <meta name="x-app-build" content="FullRepair-2026-06-30">
+  <link rel="manifest" href="manifest.json?v=20260630163623">
   <style>
     body { background-color: #0A0E14; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
     #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #ffffff; }
@@ -49,10 +46,8 @@
   </style>
 </head>
 <body>
-  <div id="loading">
-    <div class="fancy-loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-  </div>
-  <div id="buildbadge">Build: ProfileFix-2026-06-30 · 20260630160418</div>
-  <script src="flutter_bootstrap.20260630160418.js" async></script>
+  <div id="loading"><div class="fancy-loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>
+  <div id="buildbadge">Build: FullRepair-2026-06-30 · 20260630163623</div>
+  <script src="flutter_bootstrap.20260630163623.js" async></script>
 </body>
 </html>

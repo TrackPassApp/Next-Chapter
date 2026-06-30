@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -72,9 +71,8 @@ class AppRouter {
         return loggedIn ? '/browse' : '/login';
       }
 
-      if (loc == '/diagnostics' && !kDebugMode && !authProvider.isAdmin) {
-        return loggedIn ? '/browse' : '/';
-      }
+      // /diagnostics is intentionally open to anyone (logged-in or not) so
+      // users can capture and share a report when something is broken.
 
       return null;
     },
