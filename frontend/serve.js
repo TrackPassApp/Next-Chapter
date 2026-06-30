@@ -41,10 +41,18 @@ function sendFile(res, abs, status = 200) {
     }
     const ext = path.extname(abs).toLowerCase();
     const type = MIME[ext] || 'application/octet-stream';
+    // Never cache HTML, JS, or the service worker — these change on every
+    // redeploy and we cannot afford the browser/SW to keep the old bundle.
+    // Static assets (images, fonts, wasm) can be cached briefly.
+    const noStore =
+      ext === '.html' ||
+      ext === '.js' ||
+      ext === '.mjs' ||
+      ext === '.json';
     res.writeHead(status, {
       'Content-Type': type,
       'Content-Length': stat.size,
-      'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300',
+      'Cache-Control': noStore ? 'no-store, no-cache, must-revalidate' : 'public, max-age=300',
       'X-Content-Type-Options': 'nosniff',
     });
     fs.createReadStream(abs).pipe(res);
