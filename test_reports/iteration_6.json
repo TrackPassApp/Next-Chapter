@@ -1,0 +1,64 @@
+{
+  "summary": "Static validation of REWRITTEN 012_fix_duplicate_is_admin.sql (v2 — non-destructive strategy). All 6 requested checks PASS. Migration contains ZERO drop-function/drop-policy statements; 1-arg is_admin(uuid) from 001 is completely untouched so vreq_admin_select / vreq_admin_update / verif_docs_select_admin policies remain intact. Every ambiguous bare is_admin() call site is neutralised by rewriting the 6 RPCs to guard on the uniquely-named is_moderator_or_above() from 011. Bodies of all 6 RPCs match 005 verbatim apart from the guard change. Flutter web bundle still boots (HTTP 200, 2227 bytes).",
+  "checks": {
+    "1_syntactically_valid_idempotent_no_drops": {
+      "status": "PASS",
+      "evidence": "grep -in 'drop function' 012 → matches only appear in COMMENTS at lines 17-18 (explaining WHY drops were removed). grep -in 'drop policy' 012 → 0 matches. grep -in 'alter function.*is_admin' 012 → 0 matches. All 8 function definitions in 012 use `create or replace function` (idempotent). No destructive DDL of any kind."
+    },
+    "2_bare_is_admin_guards_replaced": {
+      "status": "PASS",
+      "evidence": "grep -cn 'if not public.is_admin()' 012 → 1 match, and that match is on line 73 inside a COMMENT (`--     if not public.is_admin() → if not public.is_moderator_or_above()`). Zero code-level guards use bare is_admin(). grep -cn 'if not public.is_moderator_or_above()' 012 → 7 matches: 1 comment (line 73) + 6 actual guards at lines 89, 110, 147, 186, 222, 263. The 6 code guards live inside exactly the 6 RPCs the request enumerated: admin_log (77), admin_dashboard_metrics (102), admin_user_summary (139), admin_resolve_report (175), admin_dismiss_report (212), admin_set_verification (248). Expected >=6, got exactly 6. PASS."
+    },
+    "3_rpc_bodies_semantically_identical_to_005": {
+      "status": "PASS",
+      "evidence": "diff of 005 lines 138-171 (admin_set_verification body) vs 012 lines 259-293: only differences are (a) guard swap `is_admin()` → `is_moderator_or_above()`, (b) whitespace reflow of the guard block, (c) one removed source comment `-- Ensure row exists.`. Same insert into verification_status (profile_id) values(...) on conflict (profile_id) do nothing; same dynamic execute format() upsert; same admin_log invocation. diff of 005 lines 215-236 (admin_dismiss_report) vs 012 lines 220-241: only guard swap + cosmetic `declare rep record;` on one vs two lines. admin_resolve_report body (012 L186-206) is byte-for-byte identical to 005 L186-205 apart from the guard. admin_dashboard_metrics jsonb payload (012 L114-130) identical to 005 L256-272. admin_user_summary jsonb payload (012 L151-165) identical to 005 L291-305. admin_log insert target/columns (012 L92-94) identical to 005 L41-43."
+    },
+    "4_helpers_idempotently_defined_at_top": {
+      "status": "PASS",
+      "evidence": "012 lines 48-55 define `is_moderator_or_above()` via `create or replace function`; lines 57-64 define `is_admin_or_above()` via `create or replace function`. Both are `stable` sql, granted to authenticated at lines 66-67. Guard bodies reference `auth.jwt() -> 'app_metadata' ->> 'role'` (same source of truth as 011's versions), so migration compiles and behaves correctly even on a DB that never ran 011. `create or replace` guarantees safe replay if 011 did already run — the definitions are behaviourally identical."
+    },
+    "5_no_reference_to_is_admin_uuid_1arg_overload": {
+      "status": "PASS",
+      "evidence": "grep -in 'is_admin(uuid' 012 → only matches in COMMENTS at lines 17, 18, and 32 (explaining the safety of the strategy). No SQL DDL touches is_admin(uuid). No SQL DML calls is_admin(<some_uuid>). Therefore 001's `is_admin(uid uuid default auth.uid())` overload — and the three policies depending on it (vreq_admin_select, vreq_admin_update, verif_docs_select_admin) — are completely untouched. No 42P07/2BP01 dependency errors possible when applying 012."
+    },
+    "6_flutter_web_bundle_boots": {
+      "status": "PASS",
+      "evidence": "curl https://arch-audit-dating.preview.emergentagent.com/ → HTTP 200, 2227 bytes. Byte-for-byte identical to iteration_5's smoke result — no client change was expected or made."
+    }
+  },
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "file": "012_fix_duplicate_is_admin.sql",
+        "issue": "The comment at line 34 says `is_admin() (0-arg) stays in place — harmless leftover, no caller references it after this migration runs`. That is TRUE for the 6 rewritten RPCs, but the leftover 0-arg is_admin() still exists in the catalog after 012 runs. A future migration or ad-hoc SQL that calls bare `is_admin()` would immediately re-trigger 42725 because the 1-arg overload from 001 is still there. Consider a future non-destructive follow-up that also `create or replace`s the 0-arg is_admin() into a form that just delegates to is_moderator_or_above() (already done by 011, so no action needed for this fix — just documenting the residual footgun)."
+      },
+      {
+        "file": "012_fix_duplicate_is_admin.sql",
+        "issue": "Redefined RPCs re-issue `grant execute` to `authenticated` (lines 97, 135, 170, 207, 243, 294) — correct, since `create or replace function` can reset ACLs on some Postgres versions when signature changes. Signatures here are unchanged so grants are technically already present, but re-granting is harmless and defensive. No action needed."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/test_reports/iteration_6.json"],
+  "action_items": [
+    "User can now safely apply /app/nextchapter_audit/src/supabase/migrations/012_fix_duplicate_is_admin.sql in Supabase SQL editor. No CASCADE needed. is_admin(uuid) and its 3 dependent policies (vreq_admin_select, vreq_admin_update, verif_docs_select_admin) remain intact.",
+    "After applying, reload the Admin Overview screen — `admin_dashboard_metrics()` now internally calls `is_moderator_or_above()` (unique name, no overload) so SQLSTATE 42725 cannot occur on that path.",
+    "(Optional, non-blocking) If you want belt-and-braces protection against any future SQL that calls bare `is_admin()`, add a follow-up migration that `create or replace`s the 0-arg is_admin() to delegate to is_moderator_or_above(). 011 already does this at line 62, so it is effectively already handled if 011 ran."
+  ],
+  "critical_code_review_comments": [
+    "Strategy is correct and minimal: replace the caller (RPCs) rather than the callee (function). This is the textbook non-destructive resolution when the ambiguous callee has RLS/storage policy dependencies.",
+    "Every RPC in 012 uses `security definer set search_path = public` — matches 005's original security posture. No privilege escalation, no search_path hijack risk.",
+    "Function signatures in 012 (admin_log(uuid,text,text,text,jsonb), admin_dashboard_metrics(), admin_user_summary(uuid), admin_resolve_report(uuid,text,text), admin_dismiss_report(uuid,text), admin_set_verification(uuid,text,boolean,text)) match 005's signatures exactly, so `create or replace` will succeed without needing to drop/recreate — no ACL loss, no dependent-object break.",
+    "The idempotent helper guards at 012 lines 48-64 shadow 011's definitions with create-or-replace using the same body. Safe if 011 already ran; safe if 011 never ran; safe on replay.",
+    "The upsert conflict key in admin_set_verification (line 275: `on conflict (profile_id) do nothing`) matches 005 line 153 verbatim — no risk of unique-constraint mismatch."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (6/6 static checks pass)", "frontend": "smoke: 200 OK"},
+  "test_credentials": "N/A — no auth or RPC calls performed; static-only validation as instructed (no service-role creds available).",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration_5 validated the FIRST 012 that used `drop function if exists public.is_admin(uuid)` — that turned out to fail in production because RLS policies (vreq_admin_select, vreq_admin_update on verification_requests; verif_docs_select_admin on storage.objects) depend on the 1-arg overload, so the drop errored out (would need CASCADE, which the user refused). Iteration_6 (this one) validates the SECOND 012 that avoids all drops and instead rewrites the 6 ambiguous callers to use `is_moderator_or_above()`. Live-DB end-to-end verification still requires the user to apply it via Supabase SQL editor. The residual 0-arg is_admin() is now dead code but harmless.",
+  "rca of the issue": "Same root cause as iteration_5 (Postgres 42725: two overloads of public.is_admin — the 1-arg with default from 001 and the 0-arg from 005/011 — both match a bare is_admin() call). The new mitigation swaps STRATEGY from 'drop the callee' (which broke on policy dependencies) to 'rewrite the callers to use a uniquely-named helper'. Same functional result (Admin Overview stops throwing 42725) with zero collateral damage to the 3 RLS/storage policies."
+}
