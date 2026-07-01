@@ -4,12 +4,8 @@ import 'package:provider/provider.dart';
 import '../providers/messages_provider.dart';
 import '../theme/theme.dart';
 
-/// Main app shell — persistent bottom navigation across:
-///   0 Browse     1 Activity (coming soon)
-///   2 Messages   3 My Profile     4 Settings
-///
-/// Single-click navigation, current page highlighted, designed to be
-/// expanded later without touching screens.
+/// Persistent bottom navigation.
+///   0 Browse   1 Activity   2 Community   3 Messages   4 Profile   5 Settings
 class AppShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
   const AppShell({super.key, required this.navigationShell});
@@ -43,6 +39,11 @@ class AppShell extends StatelessWidget {
             selectedIcon: Icon(Icons.favorite),
             label: 'Activity',
           ),
+          const NavigationDestination(
+            icon: Icon(Icons.forum_outlined),
+            selectedIcon: Icon(Icons.forum),
+            label: 'Community',
+          ),
           NavigationDestination(
             icon: Badge(
               isLabelVisible: msgProvider.unreadCount > 0,
@@ -56,7 +57,7 @@ class AppShell extends StatelessWidget {
           const NavigationDestination(
             icon: Icon(Icons.account_circle_outlined),
             selectedIcon: Icon(Icons.account_circle),
-            label: 'My Profile',
+            label: 'Profile',
           ),
           const NavigationDestination(
             icon: Icon(Icons.settings_outlined),

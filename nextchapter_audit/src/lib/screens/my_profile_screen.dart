@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
 import '../theme/theme.dart';
+import '../widgets/support/support_next_chapter_card.dart';
 import 'profile_detail_screen.dart';
 
 /// "My Profile" tab.
@@ -39,8 +40,14 @@ class MyProfileScreen extends StatelessWidget {
           actionLabel: 'Complete profile', onAction: () => context.go('/welcome'));
     }
 
-    // Render the public profile detail screen for own profile.
-    return ProfileDetailScreen(profileId: profile.profileId!);
+    // Render the public profile detail screen for own profile, with a small
+    // Support Next Chapter banner above it (never a paywall).
+    return Column(
+      children: [
+        const SupportNextChapterCard(variant: SupportVariant.banner),
+        Expanded(child: ProfileDetailScreen(profileId: profile.profileId!)),
+      ],
+    );
   }
 
   Widget _placeholder(TextTheme text, ColorScheme colors, String message,

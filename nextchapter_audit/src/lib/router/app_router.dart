@@ -16,6 +16,8 @@ import '../screens/messages_screen.dart';
 import '../screens/chat_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/activity_screen.dart';
+import '../screens/community_screen.dart';
+import '../screens/room_chat_screen.dart';
 import '../screens/admin_screen.dart';
 import '../screens/my_profile_screen.dart';
 import '../screens/privacy_screen.dart';
@@ -47,7 +49,7 @@ class AppRouter {
       // (browse / inbox / activity). They can still reach their own profile,
       // settings, verification, edit-profile, etc. — so the app never feels
       // like a dead-end while they're filling things in.
-      const _gatedForIncomplete = {'/browse', '/inbox', '/activity'};
+      const _gatedForIncomplete = {'/browse', '/inbox', '/activity', '/community'};
       if (loggedIn && _gatedForIncomplete.contains(loc)) {
         try {
           final pp = Provider.of<ProfileProvider>(context, listen: false);
@@ -113,6 +115,19 @@ class AppRouter {
           ]),
           StatefulShellBranch(routes: [
             GoRoute(path: '/activity', builder: (_, __) => const ActivityScreen()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/community',
+              builder: (_, __) => const CommunityScreen(),
+              routes: [
+                GoRoute(
+                  path: ':slug',
+                  builder: (_, state) =>
+                      RoomChatScreen(slug: state.pathParameters['slug']!),
+                ),
+              ],
+            ),
           ]),
           StatefulShellBranch(routes: [
             GoRoute(path: '/inbox', builder: (_, __) => const MessagesScreen()),

@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../providers/messages_provider.dart';
 import '../providers/profile_provider.dart';
 import '../theme/theme.dart';
+import '../widgets/common/ad_banner.dart';
 import '../widgets/common/conversation_tile.dart';
 import '../widgets/common/my_avatar_leading.dart';
+import '../widgets/support/support_next_chapter_card.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
@@ -56,6 +58,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
           constraints: const BoxConstraints(maxWidth: 700),
           child: Column(
             children: [
+              const AdBanner(),
+              const SupportNextChapterCard(variant: SupportVariant.banner),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMd),
                 child: Row(

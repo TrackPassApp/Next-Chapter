@@ -30,8 +30,8 @@ Pivot 3 (Msg ~430): Stop all batches; perform a **full code-level repair audit**
 - [x] **B7** Admin Dashboard
 - [x] **B8** Verification UI
 - [x] **B9** Demo community + 5-tab navigation
-- [x] **B10** Privacy, safety, account deletion pipeline (2026-07-01, awaits user-run migration 014 + live smoke test)
-- [ ] **B11** Monetization placeholders (ad slot, donation tile)
+- [x] **B10** Privacy, safety, account deletion pipeline (2026-07-01)
+- [x] **B11** Community chat rooms, monetization placeholders, donation setup, notifications scaffolding (2026-07-01, awaits user-run migrations 015 + 016)
 - [ ] **B12** End-to-end smoke test + polish
 
 ## Stabilization / Repair Log
@@ -87,7 +87,7 @@ Pivot 3 (Msg ~430): Stop all batches; perform a **full code-level repair audit**
 - `resetPasswordForEmail()` still uses deep-link redirect
 
 ## Required Migrations (in order)
-001_admin_role.sql · 002_b1_database_foundation.sql · 003_b5_messaging.sql · 004_b6_block_report.sql · 005_b7_admin.sql · 006_b8_verification.sql · 007_b9_demo_seed.sql · 008_cleanup_legacy_demos.sql · 009_fix_demo_photo_urls.sql · 010_fix_profile_rls.sql · 011_admin_role_hierarchy.sql · 012_fix_duplicate_is_admin.sql · 013_fix_admin_review_verification_request.sql · 014_account_deletion.sql
+001_admin_role.sql · 002_b1_database_foundation.sql · 003_b5_messaging.sql · 004_b6_block_report.sql · 005_b7_admin.sql · 006_b8_verification.sql · 007_b9_demo_seed.sql · 008_cleanup_legacy_demos.sql · 009_fix_demo_photo_urls.sql · 010_fix_profile_rls.sql · 011_admin_role_hierarchy.sql · 012_fix_duplicate_is_admin.sql · 013_fix_admin_review_verification_request.sql · 014_account_deletion.sql · 015_community_chat.sql · 016_notifications.sql
 
 ## Critical Operating Rule (current)
 **No new feature batches** until the user confirms Profile Detail, My Profile, and Admin all render correctly on the FullRepair-2026-06-30 build.

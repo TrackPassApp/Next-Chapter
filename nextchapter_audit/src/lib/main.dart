@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/block_provider.dart';
+import 'providers/community_provider.dart';
 import 'providers/messages_provider.dart';
+import 'providers/notifications_provider.dart';
 import 'providers/profile_provider.dart';
 import 'router/app_router.dart';
 import 'services/supabase_service.dart';
@@ -89,6 +91,8 @@ class _MyAppState extends State<MyApp> {
   late final MessagesProvider _messagesProvider;
   late final ProfileProvider _profileProvider;
   late final BlockProvider _blockProvider;
+  late final CommunityProvider _communityProvider;
+  late final NotificationsProvider _notificationsProvider;
 
   @override
   void initState() {
@@ -97,6 +101,8 @@ class _MyAppState extends State<MyApp> {
     _messagesProvider = MessagesProvider();
     _profileProvider = ProfileProvider();
     _blockProvider = BlockProvider();
+    _communityProvider = CommunityProvider();
+    _notificationsProvider = NotificationsProvider();
 
     // Load profile whenever the auth state changes (login, session restore, logout).
     _authProvider.addListener(_onAuthChanged);
@@ -108,10 +114,13 @@ class _MyAppState extends State<MyApp> {
     final userId = _authProvider.userId;
     if (userId != null) {
       _profileProvider.loadProfile(userId);
+      _notificationsProvider.bindUser(userId);
     } else {
       _profileProvider.clear();
       _messagesProvider.clear();
       _blockProvider.clear();
+      _notificationsProvider.bindUser(null);
+      _communityProvider.bindProfile(null);
     }
   }
 
@@ -120,9 +129,11 @@ class _MyAppState extends State<MyApp> {
     if (profileId != null && _messagesProvider.myProfileId != profileId) {
       _messagesProvider.bindProfile(profileId);
       _blockProvider.bindProfile(profileId);
+      _communityProvider.bindProfile(profileId);
     } else if (profileId == null && _messagesProvider.myProfileId != null) {
       _messagesProvider.clear();
       _blockProvider.clear();
+      _communityProvider.bindProfile(null);
     }
   }
 
@@ -134,6 +145,8 @@ class _MyAppState extends State<MyApp> {
     _profileProvider.dispose();
     _messagesProvider.dispose();
     _blockProvider.dispose();
+    _communityProvider.dispose();
+    _notificationsProvider.dispose();
     super.dispose();
   }
 
@@ -145,6 +158,8 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider.value(value: _messagesProvider),
         ChangeNotifierProvider.value(value: _profileProvider),
         ChangeNotifierProvider.value(value: _blockProvider),
+        ChangeNotifierProvider.value(value: _communityProvider),
+        ChangeNotifierProvider.value(value: _notificationsProvider),
       ],
       child: MaterialApp.router(
         title: 'Next Chapter',
