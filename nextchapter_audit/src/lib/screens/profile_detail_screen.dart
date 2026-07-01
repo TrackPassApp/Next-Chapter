@@ -326,6 +326,21 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
   }) {
     final validCurrent = _safeImageUrl(currentPhoto);
     return [
+      // DEBUG PROBE — a plain red 100-tall Container inserted as the first
+      // child of the profile ListView. If this box does not show up when
+      // opening a profile, the ListView itself is not being reached (which
+      // points at a nested-Scaffold layout bug) and we will drop the inner
+      // Scaffold entirely.
+      Container(
+        height: 100,
+        margin: const EdgeInsets.only(bottom: 8),
+        color: const Color(0xFFFF1744),
+        alignment: Alignment.center,
+        child: const Text(
+          'DEBUG PROBE — profile body reached',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+      ),
       // Main photo.
       AspectRatio(
         aspectRatio: 4 / 5,
