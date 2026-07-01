@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../config/app_config.dart';
@@ -193,237 +194,35 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
             ),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: ListView(
-            padding: const EdgeInsets.all(AppTheme.spacingMd),
-            children: [
-              // Main photo.
-              AspectRatio(
-                aspectRatio: 4 / 5,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-                  child: currentPhoto == null
-                      ? _NoPhotoPlaceholder(
-                          colors: colors,
-                          appColors: appColors,
-                          text: text,
-                          firstName: profile.firstName,
-                          isOwn: isOwn,
-                          onAdd: isOwn ? () => context.push('/me/edit') : null,
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: currentPhoto,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(color: colors.surfaceContainerHighest),
-                          errorWidget: (_, __, ___) => _NoPhotoPlaceholder(
-                            colors: colors,
-                            appColors: appColors,
-                            text: text,
-                            firstName: profile.firstName,
-                            isOwn: isOwn,
-                            onAdd: isOwn ? () => context.push('/me/edit') : null,
-                            broken: true,
-                          ),
-                        ),
-                ),
-              ),
-              if (photos.length > 1) ...[
-                const SizedBox(height: AppTheme.spacingSm),
-                SizedBox(
-                  height: 64,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: photos.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: AppTheme.spacingSm),
-                    itemBuilder: (_, i) => GestureDetector(
-                      onTap: () => setState(() => _photoIndex = i),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                          border: Border.all(
-                            color: i == _photoIndex ? colors.primary : Colors.transparent,
-                            width: 2,
-                          ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                          child: CachedNetworkImage(
-                            imageUrl: photos[i],
-                            width: 56, height: 56, fit: BoxFit.cover,
-                            placeholder: (_, __) => Container(color: colors.surfaceContainerHighest),
-                            errorWidget: (_, __, ___) => Container(color: colors.surfaceContainerHighest),
-                          ),
-                        ),
-                      ),
-                    ),
+      body: Builder(
+        builder: (context) {
+          // Any exception thrown by any widget below this Builder is caught
+          // here and rendered as a big red panel on the screen so it can
+          // never silently blank out the body again. This runs in profile
+          // and release mode, not just debug.
+          try {
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: ListView(
+                  padding: const EdgeInsets.all(AppTheme.spacingMd),
+                  children: _buildBody(
+                    context: context,
+                    profile: profile,
+                    isOwn: isOwn,
+                    photos: photos,
+                    currentPhoto: currentPhoto,
+                    colors: colors,
+                    text: text,
+                    appColors: appColors,
                   ),
                 ),
-              ],
-
-              const SizedBox(height: AppTheme.spacingLg),
-
-              // Name + age + online + edit / completeness.
-              Row(
-                children: [
-                  Expanded(
-                    child: Text('${profile.firstName}, ${profile.age}', style: text.headlineSmall),
-                  ),
-                  if (profile.isOnline)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: appColors.online, borderRadius: BorderRadius.circular(AppTheme.radiusXl)),
-                      child: Text('Online', style: text.labelSmall?.copyWith(color: Colors.white)),
-                    ),
-                  if (isOwn) ...[
-                    const SizedBox(width: AppTheme.spacingMd),
-                    CompletenessRing(score: profile.completenessScore, size: 48),
-                  ],
-                ],
               ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(Icons.location_on_outlined, size: 16, color: appColors.subtleText),
-                  const SizedBox(width: 4),
-                  Text('${profile.city}, ${profile.state}', style: text.bodyMedium?.copyWith(color: appColors.subtleText)),
-                ],
-              ),
-
-              if (profile.hasAnyVerification) ...[
-                const SizedBox(height: AppTheme.spacingMd),
-                VerificationBadges(
-                  email: profile.emailVerified,
-                  phone: profile.phoneVerified,
-                  selfie: profile.selfieVerified,
-                  id: profile.idVerified,
-                  expanded: true,
-                ),
-              ] else if (isOwn) ...[
-                const SizedBox(height: AppTheme.spacingMd),
-                _EmptyHint(
-                  icon: Icons.verified_outlined,
-                  text: 'You have no verifications yet.',
-                  actionLabel: 'Get verified',
-                  onAction: () => context.push('/me/verification'),
-                ),
-              ],
-
-              if (profile.modes.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.spacingMd),
-                Wrap(
-                  spacing: AppTheme.spacingSm,
-                  runSpacing: AppTheme.spacingSm,
-                  children: profile.modes
-                      .map((m) => _ModeBadge(label: ModeOptions.label(m), colors: colors, text: text))
-                      .toList(),
-                ),
-              ],
-
-              _Section(
-                title: 'About Me',
-                icon: Icons.person_outline,
-                child: profile.aboutMe.isNotEmpty
-                    ? Text(profile.aboutMe, style: text.bodyLarge)
-                    : _EmptyHint(
-                        icon: Icons.edit_note_outlined,
-                        text: isOwn
-                            ? 'Tell people who you are — even one line helps.'
-                            : 'No bio yet.',
-                        actionLabel: isOwn ? 'Add bio' : null,
-                        onAction: isOwn ? () => context.push('/me/edit') : null,
-                      ),
-              ),
-
-              _Section(
-                title: isOwn ? 'My Story' : 'Their Story',
-                icon: Icons.format_quote_outlined,
-                child: profile.prompts.isNotEmpty
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: profile.prompts.map((p) => Container(
-                          margin: const EdgeInsets.only(bottom: AppTheme.spacingSm),
-                          padding: const EdgeInsets.all(AppTheme.spacingMd),
-                          decoration: BoxDecoration(
-                            color: colors.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                            border: Border.all(color: colors.outlineVariant),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(p.promptKey, style: text.labelMedium?.copyWith(color: colors.primary, fontWeight: FontWeight.w600)),
-                              const SizedBox(height: 4),
-                              Text(p.answer, style: text.bodyLarge),
-                            ],
-                          ),
-                        )).toList(),
-                      )
-                    : _EmptyHint(
-                        icon: Icons.format_quote_outlined,
-                        text: isOwn
-                            ? 'Answer a few prompts to add personality.'
-                            : 'No prompts yet.',
-                        actionLabel: isOwn ? 'Add prompts' : null,
-                        onAction: isOwn ? () => context.push('/me/edit') : null,
-                      ),
-              ),
-
-              _Section(
-                title: 'Looking For',
-                icon: Icons.favorite_outline,
-                child: profile.lookingFor.isNotEmpty
-                    ? _chips(profile.lookingFor, colors.primaryContainer)
-                    : _EmptyHint(
-                        icon: Icons.favorite_outline,
-                        text: isOwn ? 'Tell people what you\'re open to.' : 'Not specified.',
-                        actionLabel: isOwn ? 'Set preferences' : null,
-                        onAction: isOwn ? () => context.push('/me/edit') : null,
-                      ),
-              ),
-
-              _Section(
-                title: 'Interests',
-                icon: Icons.interests_outlined,
-                child: profile.interests.isNotEmpty
-                    ? _chips(profile.interests, colors.secondaryContainer)
-                    : _EmptyHint(
-                        icon: Icons.interests_outlined,
-                        text: isOwn ? 'Add interests so others can connect.' : 'No interests listed.',
-                        actionLabel: isOwn ? 'Add interests' : null,
-                        onAction: isOwn ? () => context.push('/me/edit') : null,
-                      ),
-              ),
-
-              _Section(
-                title: 'Life Situation',
-                icon: Icons.timeline_outlined,
-                child: profile.lifeSituation.isNotEmpty
-                    ? _chips(profile.lifeSituation, colors.tertiaryContainer)
-                    : _EmptyHint(
-                        icon: Icons.timeline_outlined,
-                        text: isOwn ? 'Share where you are in life.' : 'Not specified.',
-                        actionLabel: isOwn ? 'Add details' : null,
-                        onAction: isOwn ? () => context.push('/me/edit') : null,
-                      ),
-              ),
-
-              _Section(
-                title: 'Details',
-                icon: Icons.info_outline,
-                child: Column(
-                  children: [
-                    _kv('Gender', profile.gender, text, appColors),
-                    _kv('Status', profile.relationshipStatus, text, appColors),
-                    _kv('Location', '${profile.city}, ${profile.state}', text, appColors),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppTheme.spacingXxl),
-            ],
-          ),
-        ),
+            );
+          } catch (e, st) {
+            return _InlineError(error: e, stack: st, appColors: appColors, text: text);
+          }
+        },
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
@@ -491,6 +290,278 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
         ],
       ),
     );
+  }
+
+  /// Validate the URL before we hand it to CachedNetworkImage.
+  /// Returns null (so the caller renders the initials placeholder) for:
+  ///   * null / empty / whitespace
+  ///   * strings that do not parse as absolute http(s) URIs
+  /// CachedNetworkImage assumes the URL is valid; a bogus value (empty
+  /// string, "null", asset:// paths, storage:… paths) throws before the
+  /// error widget ever gets a chance to display, which used to blank the
+  /// whole tile.
+  static String? _safeImageUrl(String? raw) {
+    if (raw == null) return null;
+    final s = raw.trim();
+    if (s.isEmpty) return null;
+    final uri = Uri.tryParse(s);
+    if (uri == null || !uri.hasAbsolutePath) return null;
+    if (uri.scheme != 'http' && uri.scheme != 'https') return null;
+    return s;
+  }
+
+  /// The scrolling body content. Extracted so the outer Builder can wrap
+  /// it in a try/catch — any exception thrown by any widget below is
+  /// intercepted and rendered as a big red panel with the file/line stack
+  /// instead of silently blanking the Profile Detail body.
+  List<Widget> _buildBody({
+    required BuildContext context,
+    required UserProfile profile,
+    required bool isOwn,
+    required List<String> photos,
+    required String? currentPhoto,
+    required ColorScheme colors,
+    required TextTheme text,
+    required AppColorsExtension appColors,
+  }) {
+    final validCurrent = _safeImageUrl(currentPhoto);
+    return [
+      // Main photo.
+      AspectRatio(
+        aspectRatio: 4 / 5,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+          child: validCurrent == null
+              ? _NoPhotoPlaceholder(
+                  colors: colors,
+                  appColors: appColors,
+                  text: text,
+                  firstName: profile.firstName,
+                  isOwn: isOwn,
+                  onAdd: isOwn ? () => context.push('/me/edit') : null,
+                )
+              : CachedNetworkImage(
+                  imageUrl: validCurrent,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(color: colors.surfaceContainerHighest),
+                  errorWidget: (_, __, ___) => _NoPhotoPlaceholder(
+                    colors: colors,
+                    appColors: appColors,
+                    text: text,
+                    firstName: profile.firstName,
+                    isOwn: isOwn,
+                    onAdd: isOwn ? () => context.push('/me/edit') : null,
+                    broken: true,
+                  ),
+                ),
+        ),
+      ),
+      if (photos.length > 1) ...[
+        const SizedBox(height: AppTheme.spacingSm),
+        SizedBox(
+          height: 64,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: photos.length,
+            separatorBuilder: (_, __) => const SizedBox(width: AppTheme.spacingSm),
+            itemBuilder: (_, i) {
+              final thumbUrl = _safeImageUrl(photos[i]);
+              return GestureDetector(
+                onTap: () => setState(() => _photoIndex = i),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                    border: Border.all(
+                      color: i == _photoIndex ? colors.primary : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                    child: thumbUrl == null
+                        ? Container(
+                            width: 56, height: 56,
+                            color: colors.surfaceContainerHighest,
+                            alignment: Alignment.center,
+                            child: Icon(Icons.image_not_supported_outlined,
+                                size: 20, color: appColors.subtleText),
+                          )
+                        : CachedNetworkImage(
+                            imageUrl: thumbUrl,
+                            width: 56, height: 56, fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(color: colors.surfaceContainerHighest),
+                            errorWidget: (_, __, ___) => Container(
+                              width: 56, height: 56,
+                              color: colors.surfaceContainerHighest,
+                              alignment: Alignment.center,
+                              child: Icon(Icons.broken_image_outlined,
+                                  size: 20, color: appColors.subtleText),
+                            ),
+                          ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+
+      const SizedBox(height: AppTheme.spacingLg),
+
+      // Name + age + online + edit / completeness.
+      Row(
+        children: [
+          Expanded(
+            child: Text('${profile.firstName}, ${profile.age}', style: text.headlineSmall),
+          ),
+          if (profile.isOnline)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: appColors.online, borderRadius: BorderRadius.circular(AppTheme.radiusXl)),
+              child: Text('Online', style: text.labelSmall?.copyWith(color: Colors.white)),
+            ),
+          if (isOwn) ...[
+            const SizedBox(width: AppTheme.spacingMd),
+            CompletenessRing(score: profile.completenessScore, size: 48),
+          ],
+        ],
+      ),
+      const SizedBox(height: 4),
+      Row(
+        children: [
+          Icon(Icons.location_on_outlined, size: 16, color: appColors.subtleText),
+          const SizedBox(width: 4),
+          Text('${profile.city}, ${profile.state}', style: text.bodyMedium?.copyWith(color: appColors.subtleText)),
+        ],
+      ),
+
+      if (profile.hasAnyVerification) ...[
+        const SizedBox(height: AppTheme.spacingMd),
+        VerificationBadges(
+          email: profile.emailVerified,
+          phone: profile.phoneVerified,
+          selfie: profile.selfieVerified,
+          id: profile.idVerified,
+          expanded: true,
+        ),
+      ] else if (isOwn) ...[
+        const SizedBox(height: AppTheme.spacingMd),
+        _EmptyHint(
+          icon: Icons.verified_outlined,
+          text: 'You have no verifications yet.',
+          actionLabel: 'Get verified',
+          onAction: () => context.push('/me/verification'),
+        ),
+      ],
+
+      if (profile.modes.isNotEmpty) ...[
+        const SizedBox(height: AppTheme.spacingMd),
+        Wrap(
+          spacing: AppTheme.spacingSm,
+          runSpacing: AppTheme.spacingSm,
+          children: profile.modes
+              .map((m) => _ModeBadge(label: ModeOptions.label(m), colors: colors, text: text))
+              .toList(),
+        ),
+      ],
+
+      _Section(
+        title: 'About Me',
+        icon: Icons.person_outline,
+        child: profile.aboutMe.isNotEmpty
+            ? Text(profile.aboutMe, style: text.bodyLarge)
+            : _EmptyHint(
+                icon: Icons.edit_note_outlined,
+                text: isOwn ? 'Tell people who you are — even one line helps.' : 'No bio yet.',
+                actionLabel: isOwn ? 'Add bio' : null,
+                onAction: isOwn ? () => context.push('/me/edit') : null,
+              ),
+      ),
+
+      _Section(
+        title: isOwn ? 'My Story' : 'Their Story',
+        icon: Icons.format_quote_outlined,
+        child: profile.prompts.isNotEmpty
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: profile.prompts.map((p) => Container(
+                  margin: const EdgeInsets.only(bottom: AppTheme.spacingSm),
+                  padding: const EdgeInsets.all(AppTheme.spacingMd),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                    border: Border.all(color: colors.outlineVariant),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(p.promptKey, style: text.labelMedium?.copyWith(color: colors.primary, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 4),
+                      Text(p.answer, style: text.bodyLarge),
+                    ],
+                  ),
+                )).toList(),
+              )
+            : _EmptyHint(
+                icon: Icons.format_quote_outlined,
+                text: isOwn ? 'Answer a few prompts to add personality.' : 'No prompts yet.',
+                actionLabel: isOwn ? 'Add prompts' : null,
+                onAction: isOwn ? () => context.push('/me/edit') : null,
+              ),
+      ),
+
+      _Section(
+        title: 'Looking For',
+        icon: Icons.favorite_outline,
+        child: profile.lookingFor.isNotEmpty
+            ? _chips(profile.lookingFor, colors.primaryContainer)
+            : _EmptyHint(
+                icon: Icons.favorite_outline,
+                text: isOwn ? 'Tell people what you\'re open to.' : 'Not specified.',
+                actionLabel: isOwn ? 'Set preferences' : null,
+                onAction: isOwn ? () => context.push('/me/edit') : null,
+              ),
+      ),
+
+      _Section(
+        title: 'Interests',
+        icon: Icons.interests_outlined,
+        child: profile.interests.isNotEmpty
+            ? _chips(profile.interests, colors.secondaryContainer)
+            : _EmptyHint(
+                icon: Icons.interests_outlined,
+                text: isOwn ? 'Add interests so others can connect.' : 'No interests listed.',
+                actionLabel: isOwn ? 'Add interests' : null,
+                onAction: isOwn ? () => context.push('/me/edit') : null,
+              ),
+      ),
+
+      _Section(
+        title: 'Life Situation',
+        icon: Icons.timeline_outlined,
+        child: profile.lifeSituation.isNotEmpty
+            ? _chips(profile.lifeSituation, colors.tertiaryContainer)
+            : _EmptyHint(
+                icon: Icons.timeline_outlined,
+                text: isOwn ? 'Share where you are in life.' : 'Not specified.',
+                actionLabel: isOwn ? 'Add details' : null,
+                onAction: isOwn ? () => context.push('/me/edit') : null,
+              ),
+      ),
+
+      _Section(
+        title: 'Details',
+        icon: Icons.info_outline,
+        child: Column(
+          children: [
+            _kv('Gender', profile.gender, text, appColors),
+            _kv('Status', profile.relationshipStatus, text, appColors),
+            _kv('Location', '${profile.city}, ${profile.state}', text, appColors),
+          ],
+        ),
+      ),
+      const SizedBox(height: AppTheme.spacingXxl),
+    ];
   }
 
   // ─── Actions ─────────────────────────────────────────────────────────────
@@ -729,6 +800,95 @@ class _EmptyHint extends StatelessWidget {
             TextButton(onPressed: onAction, child: Text(actionLabel!)),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Rendered in place of the profile body when any widget below the try/catch
+/// throws. Shows the exception text, first six stack frames, and lets the
+/// user copy or return to Browse — nothing is silent.
+class _InlineError extends StatelessWidget {
+  final Object error;
+  final StackTrace stack;
+  final AppColorsExtension appColors;
+  final TextTheme text;
+  const _InlineError({
+    required this.error,
+    required this.stack,
+    required this.appColors,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final frames = stack.toString().split('\n').take(8).join('\n');
+    final fullText = 'Profile Detail render error\n\n$error\n\n$frames';
+    return Container(
+      color: const Color(0xFFFFEBEE),
+      padding: const EdgeInsets.all(AppTheme.spacingLg),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(children: [
+              Icon(Icons.error_outline, color: Color(0xFFB71C1C), size: 22),
+              SizedBox(width: 8),
+              Text(
+                'Profile Detail render error',
+                style: TextStyle(
+                  color: Color(0xFFB71C1C),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+            ]),
+            const SizedBox(height: AppTheme.spacingMd),
+            SelectableText(
+              error.toString(),
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 13,
+                color: Color(0xFFB71C1C),
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingMd),
+            const Text(
+              'Stack (first 8 frames):',
+              style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF7F0000)),
+            ),
+            const SizedBox(height: 4),
+            SelectableText(
+              frames,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 11,
+                color: Color(0xFF7F0000),
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingLg),
+            Wrap(
+              spacing: AppTheme.spacingSm,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: fullText));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Error report copied to clipboard')),
+                    );
+                  },
+                  icon: const Icon(Icons.copy_all_outlined, size: 18),
+                  label: const Text('Copy error'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => context.go('/browse'),
+                  icon: const Icon(Icons.arrow_back, size: 18),
+                  label: const Text('Back to Browse'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
