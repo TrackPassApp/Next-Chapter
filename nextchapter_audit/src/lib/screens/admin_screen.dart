@@ -10,6 +10,7 @@ import '../widgets/admin/admin_reports_tab.dart';
 import '../widgets/admin/admin_verification_tab.dart';
 import '../widgets/admin/admin_log_tab.dart';
 import '../widgets/admin/admin_roles_tab.dart';
+import '../widgets/admin/admin_rc1_tabs.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
@@ -47,6 +48,10 @@ class AdminScreen extends StatelessWidget {
       const Tab(icon: Icon(Icons.people_outline),        text: 'Users'),
       const Tab(icon: Icon(Icons.flag_outlined),         text: 'Reports'),
       const Tab(icon: Icon(Icons.verified_outlined),     text: 'Verification'),
+      const Tab(icon: Icon(Icons.forum_outlined),        text: 'Community'),
+      const Tab(icon: Icon(Icons.stars_outlined),        text: 'Stories'),
+      const Tab(icon: Icon(Icons.campaign_outlined),     text: 'Announcements'),
+      const Tab(icon: Icon(Icons.person_off_outlined),   text: 'Deleted'),
       const Tab(icon: Icon(Icons.history),               text: 'Moderation Log'),
       const Tab(icon: Icon(Icons.admin_panel_settings_outlined), text: 'Roles'),
     ];
@@ -55,6 +60,10 @@ class AdminScreen extends StatelessWidget {
       const AdminUsersTab(),
       const AdminReportsTab(),
       const AdminVerificationTab(),
+      const AdminCommunityTab(),
+      const AdminStoriesTab(),
+      const AdminAnnouncementsTab(),
+      const AdminDeletedTab(),
       const AdminLogTab(),
       const AdminRolesTab(),
     ];
