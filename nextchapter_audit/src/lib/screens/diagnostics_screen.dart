@@ -133,22 +133,34 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         _add('Browse fetch (fetchAllProfiles)', 'EXCEPTION: $e', _RowStatus.fail);
       }
 
-      // 7. Demo seed presence — quick sanity, identifies whether 007 ran.
+      // 7. Demo seed presence — via the SQL function created in
+      // migration 010 (uses uuid equality, never LIKE on a uuid column).
       try {
         final db = SupabaseService.client!;
-        final demo = await db
-            .from('profiles')
-            .select('id, first_name')
-            .like('id', '%-aaaa-%')
-            .limit(20);
-        _add('Demo seed (uuids with -aaaa-)',
-            '${(demo as List).length} rows',
-            (demo).isEmpty ? _RowStatus.fail : _RowStatus.pass,
-            detail: (demo as List).isEmpty
-                ? 'Demo profiles not present. Run migration 007_b9_demo_seed.sql then 009_fix_demo_photo_urls.sql.'
-                : (demo as List).map((r) => r['first_name']).join(', '));
+        final result = await db.rpc('demo_seed_count');
+        // The RPC returns a table (count int, names text). PostgREST wraps
+        // it as a List<Map>; single-row functions may also come back as a
+        // Map. Handle both shapes defensively.
+        Map<String, dynamic>? row;
+        if (result is List && result.isNotEmpty) {
+          row = Map<String, dynamic>.from(result.first as Map);
+        } else if (result is Map) {
+          row = Map<String, dynamic>.from(result);
+        }
+        final count = (row?['count'] as num?)?.toInt() ?? 0;
+        final names = (row?['names'] as String?) ?? '';
+        _add('Demo seed (demo_seed_count RPC)',
+            '$count / 6 rows${names.isEmpty ? '' : ' — $names'}',
+            count >= 6 ? _RowStatus.pass : _RowStatus.fail,
+            detail: count >= 6
+                ? 'All six canonical demo profiles are present.'
+                : 'Missing demo profiles. Run migration 007_b9_demo_seed.sql, '
+                    'then 008_cleanup_legacy_demos.sql, 009_fix_demo_photo_urls.sql, '
+                    'and 010_fix_profile_rls.sql.');
       } catch (e) {
-        _add('Demo seed check', 'EXCEPTION: $e', _RowStatus.fail);
+        _add('Demo seed (demo_seed_count RPC)', 'EXCEPTION: $e', _RowStatus.fail,
+            detail: 'If this says "function demo_seed_count() does not exist", '
+                'run migration 010_fix_profile_rls.sql in the Supabase SQL editor.');
       }
     }
 
