@@ -5,8 +5,9 @@
 -- account cannot send new messages. Existing rows (profiles, messages,
 -- reports, moderation_log) are preserved so admins retain full history.
 --
--- Retention: `profiles.deleted_at` (column already exists from 002) is set
--- when the RPC runs. A future hard-delete cron / RPC can scan for rows where
+-- Retention: `profiles.deleted_at` is set when the RPC runs. This migration
+-- adds the column if it is missing (older installs never had it). A future
+-- hard-delete cron / RPC can scan for rows where
 -- `deleted_at < now() - interval '30 days'` and permanently purge. Not built
 -- here per user instruction.
 --
@@ -14,7 +15,16 @@
 -- =============================================================================
 
 
--- ── 1. Ensure the deleted_at column has an index for the future cron ─────
+-- ── 1. Ensure required columns exist on public.profiles ──────────────────
+-- Older installs never had `deleted_at` added to `profiles` (the column
+-- with that name lives on `public.messages`). Add anything that might be
+-- missing before we try to use it. All are additive + idempotent.
+alter table public.profiles
+  add column if not exists is_deleted   boolean     not null default false,
+  add column if not exists is_suspended boolean     not null default false,
+  add column if not exists deleted_at   timestamptz;
+
+-- Ensure the deleted_at column has an index for the future 30-day cron.
 create index if not exists profiles_deleted_at_idx
   on public.profiles (deleted_at)
   where is_deleted = true;
