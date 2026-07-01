@@ -1,0 +1,67 @@
+{
+  "summary": "Static code-level validation of SQL migration 012_fix_duplicate_is_admin.sql (fix for PostgrestException 42725 'function public.is_admin() is not unique' on Admin Overview) + Flutter web boot smoke test. All 6 requested checks PASS. Fix is validated at the source level. Live DB verification requires the user to apply the migration in Supabase SQL editor (no service-role creds available here).",
+  "checks": {
+    "1_sql_syntactically_valid_and_idempotent": {
+      "status": "PASS",
+      "evidence": "012 uses only standard Postgres/Supabase constructs: `drop function if exists`, `create or replace function`, `grant execute`, `comment on function`. All statements are idempotent. Re-running the file produces the same end state: exactly one public.is_admin() overload."
+    },
+    "2_drops_1arg_overload_from_001": {
+      "status": "PASS",
+      "evidence": "012 line 34: `drop function if exists public.is_admin(uuid);` — matches the 1-arg signature created at 001 line 68 (`create or replace function public.is_admin(uid uuid default auth.uid()) returns boolean`). The `if exists` guard makes it safe when re-run or when 001 was never present."
+    },
+    "3_recreates_single_0arg_is_admin_delegating_to_jwt_role": {
+      "status": "PASS",
+      "evidence": "012 lines 42-51 create `public.is_admin() returns boolean` with body `select coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') in ('moderator','admin','super_admin')`. Marked `stable`, `security definer`, `set search_path = public`, granted to `authenticated`. Semantically identical to 011's version (011 delegates via `is_moderator_or_above()` which checks the same three roles) — no behavioural drift."
+    },
+    "4_no_caller_uses_is_admin_with_explicit_uuid_arg": {
+      "status": "PASS",
+      "evidence": "Grep of `/app/nextchapter_audit/src/` for `is_admin(<non-empty>)` returned only (a) 001's own definition/comment and (b) 012's own drop statement/comment. All 20+ callers in migrations 005 and 006 use the zero-arg form `public.is_admin()`. The Dart repository layer (`src/lib/repositories/admin_repository.dart`) contains only a docstring mention, no actual RPC call to `is_admin`. Zero regression risk from dropping the 1-arg overload."
+    },
+    "5_flutter_web_bundle_still_boots": {
+      "status": "PASS",
+      "evidence": "curl https://arch-audit-dating.preview.emergentagent.com/ -> HTTP 200, 2227 bytes, contains the `flutter_bootstrap` marker and expected Flutter shell HTML (service-worker unregister block + language shim). No red-screen error page. Smoke test only — did not sign in as instructed."
+    },
+    "6_migration_012_is_minimal_targeted_fix_for_ambiguity_in_001_005_011": {
+      "status": "PASS_WITH_HISTORICAL_NOTE",
+      "evidence": "Confirmed the ambiguity chain: 001 line 68 creates `is_admin(uid uuid default auth.uid())` (1-arg with default) → 005 line 16 creates `is_admin()` (0-arg) → both overloads match a bare `is_admin()` call → 42725. Migration 006 line 33 previously tried to patch this by dropping the 0-arg (`drop function if exists public.is_admin();`), but migration 011 line 62 re-created the 0-arg version, resurrecting the ambiguity. Migration 012 is the correct minimal fix: it drops the 1-arg overload (the one nobody calls with an argument) and reasserts the 0-arg version as canonical. Change is minimal, targeted, and behaviour-preserving."
+    }
+  },
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "file": "src/supabase/migrations/001_admin_role.sql",
+        "issue": "Line 85 has `comment on function public.is_admin(uuid) is ...`. After 012 runs, this comment is dropped along with the function. Not a bug — just noting that if 001 is ever re-run on a DB where 012 has already been applied, the `create or replace function public.is_admin(uid uuid default auth.uid())` on line 68 will RECREATE the 1-arg overload and re-introduce the ambiguity until 012 is re-run. Consider adding a note at the top of 001 or converting the CREATE to a no-op guard. Not blocking the current fix."
+      },
+      {
+        "file": "src/supabase/migrations/006_b8_verification.sql",
+        "issue": "Line 33 `drop function if exists public.is_admin();` is now stale/misleading — it was 006's own attempt at the same fix but drops the wrong overload (the 0-arg one). If migrations are ever replayed from scratch in order, 006 will drop the 0-arg (created by 005), leaving only the 1-arg with default, which still works via default resolution — so 006 alone would not trigger 42725. The bug re-appears only once 011 re-creates the 0-arg. Consider removing or commenting out 006 line 33 in a future cleanup to keep migration history coherent. Not required for the 012 fix to work."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "User must apply /app/nextchapter_audit/src/supabase/migrations/012_fix_duplicate_is_admin.sql via Supabase SQL editor.",
+    "After running, verify with: `select public.is_admin_overload_count();` — expected 1.",
+    "Then reload the Admin Overview screen; the 42725 error should be gone.",
+    "(Optional cleanup, non-blocking) — Remove or comment out the stale `drop function if exists public.is_admin();` in 006_b8_verification.sql to prevent future confusion; and add a note at the top of 001_admin_role.sql stating the 1-arg overload is superseded by 012."
+  ],
+  "critical_code_review_comments": [
+    "Migration 012 is textbook: idempotent, minimal, behaviour-preserving, includes a self-verification helper (`is_admin_overload_count`). No SQL-injection surface (no dynamic identifiers concatenated from user input).",
+    "The included `is_admin_overload_count()` helper is granted to `authenticated`, which leaks the number of overloads publicly. Very low risk (it will always return 1 after the fix) — could be tightened to service_role in a follow-up, but not worth blocking on.",
+    "Consider adding `security definer` explicitly to `is_admin_overload_count()` if you want authenticated users to see pg_proc rows they normally wouldn't; on stock Supabase, pg_proc is world-readable so this is likely fine as-is."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (6/6 static checks pass)", "frontend": "smoke-test only: 200 OK, Flutter shell present"},
+  "test_credentials": "N/A — no auth or RPC calls performed (per request).",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The is_admin() overload ambiguity has a long history in this repo: 006 tried to patch it once (dropping the 0-arg), then 011 undid that patch (recreated 0-arg). 012 is the definitive fix that drops the 1-arg overload instead. If a future migration ever re-creates `public.is_admin(uid uuid default ...)` the bug will return — add a lint/check for that. End-to-end validation (calling admin_dashboard_metrics as an admin JWT and asserting no 42725) requires Supabase service-role creds which are not available in this environment.",
+  "rca of the issue": "ROOT CAUSE: Postgres function overload resolution cannot choose between `public.is_admin()` (from 005/011) and `public.is_admin(uid uuid default auth.uid())` (from 001) when called with zero arguments, because both signatures are valid candidates for a bare `is_admin()` call. Postgres raises SQLSTATE 42725 (`function is not unique`). The Admin Overview screen calls `admin_dashboard_metrics()`, which internally calls `is_admin()` — hence the user-visible PostgrestException. REPRO: Run 001 then 005 (or 011) on a fresh DB, then `select public.is_admin();` — fails 42725. MITIGATION (applied by 012): Drop the 1-arg overload (`drop function if exists public.is_admin(uuid);`) and reassert a single canonical 0-arg overload. Verified statically that no code path in the repo calls `is_admin` with an explicit uuid argument, so dropping the 1-arg overload is safe."
+}
