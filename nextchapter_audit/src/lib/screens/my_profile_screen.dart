@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
 import '../theme/theme.dart';
+import '../widgets/profile/profile_completion_card.dart';
 import '../widgets/support/support_next_chapter_card.dart';
 import 'profile_detail_screen.dart';
 
@@ -45,6 +46,7 @@ class MyProfileScreen extends StatelessWidget {
     return Column(
       children: [
         const SupportNextChapterCard(variant: SupportVariant.banner),
+        const ProfileCompletionCard(),
         Expanded(child: ProfileDetailScreen(profileId: profile.profileId!)),
       ],
     );

@@ -42,9 +42,37 @@ class SettingsScreen extends StatelessWidget {
                   _SettingsTile(icon: Icons.verified_user_outlined, title: 'Verification Status', onTap: () {
                     context.go('/me/verification');
                   }),
+                  _SettingsTile(
+                    icon: Icons.notifications_outlined,
+                    title: 'Notification Settings',
+                    onTap: () => context.push('/notifications/settings'),
+                  ),
                   _SettingsTile(icon: Icons.block_outlined, title: 'Blocked Users', onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No blocked users')));
                   }),
+                ],
+                colors: colors,
+                text: text,
+              ),
+              const SizedBox(height: AppTheme.spacingMd),
+              _SettingsSection(
+                title: 'About',
+                children: [
+                  _SettingsTile(
+                    icon: Icons.info_outline,
+                    title: 'About Next Chapter',
+                    onTap: () => context.push('/about'),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.auto_stories_outlined,
+                    title: 'Letter from the Founder',
+                    onTap: () => context.push('/about/letter'),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.stars_outlined,
+                    title: 'Success Stories',
+                    onTap: () => context.push('/stories'),
+                  ),
                 ],
                 colors: colors,
                 text: text,
@@ -101,11 +129,6 @@ class SettingsScreen extends StatelessWidget {
                         title: 'Admin Dashboard (${(auth.role ?? "").toUpperCase()})',
                         color: appColors.danger,
                         onTap: () => context.go('/admin'),
-                      ),
-                      _SettingsTile(
-                        icon: Icons.bug_report_outlined,
-                        title: 'Diagnostics',
-                        onTap: () => context.push('/admin/diagnostics'),
                       ),
                     ],
                     colors: colors,

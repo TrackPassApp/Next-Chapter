@@ -31,8 +31,9 @@ Pivot 3 (Msg ~430): Stop all batches; perform a **full code-level repair audit**
 - [x] **B8** Verification UI
 - [x] **B9** Demo community + 5-tab navigation
 - [x] **B10** Privacy, safety, account deletion pipeline (2026-07-01)
-- [x] **B11** Community chat rooms, monetization placeholders, donation setup, notifications scaffolding (2026-07-01, awaits user-run migrations 015 + 016)
-- [ ] **B12** End-to-end smoke test + polish
+- [x] **B11** Community chat rooms, monetization placeholders, donation setup, notifications scaffolding (2026-07-01)
+- [x] **RC1** Founder welcome, provider-scoped Support, notifications center + prefs, community enhancements, profile completion, success stories, daily inspiration, moderation RPCs, events stub (2026-07-01, awaits user-run migration 017)
+- [ ] **Beta 1.0** Final QA + release cut
 
 ## Stabilization / Repair Log
 - 2026-07-01 — **B10 Account Deletion Pipeline** (`014_account_deletion.sql`, `settings_screen.dart`, released as build `B10-20260701163651`):
@@ -87,7 +88,7 @@ Pivot 3 (Msg ~430): Stop all batches; perform a **full code-level repair audit**
 - `resetPasswordForEmail()` still uses deep-link redirect
 
 ## Required Migrations (in order)
-001_admin_role.sql · 002_b1_database_foundation.sql · 003_b5_messaging.sql · 004_b6_block_report.sql · 005_b7_admin.sql · 006_b8_verification.sql · 007_b9_demo_seed.sql · 008_cleanup_legacy_demos.sql · 009_fix_demo_photo_urls.sql · 010_fix_profile_rls.sql · 011_admin_role_hierarchy.sql · 012_fix_duplicate_is_admin.sql · 013_fix_admin_review_verification_request.sql · 014_account_deletion.sql · 015_community_chat.sql · 016_notifications.sql
+001..016 (previous) · 017_rc1.sql
 
 ## Critical Operating Rule (current)
 **No new feature batches** until the user confirms Profile Detail, My Profile, and Admin all render correctly on the FullRepair-2026-06-30 build.

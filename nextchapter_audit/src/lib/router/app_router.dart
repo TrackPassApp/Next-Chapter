@@ -16,15 +16,20 @@ import '../screens/messages_screen.dart';
 import '../screens/chat_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/activity_screen.dart';
+import '../screens/about_screen.dart';
 import '../screens/community_screen.dart';
+import '../screens/founder_letter_screen.dart';
+import '../screens/notification_settings_screen.dart';
+import '../screens/notifications_screen.dart';
 import '../screens/room_chat_screen.dart';
+import '../screens/success_stories_screen.dart';
+import '../screens/welcome_letter_screen.dart';
 import '../screens/admin_screen.dart';
 import '../screens/my_profile_screen.dart';
 import '../screens/privacy_screen.dart';
 import '../screens/terms_screen.dart';
 import '../screens/app_shell.dart';
 import '../screens/verification_status_screen.dart';
-import '../screens/diagnostics_screen.dart';
 
 class AppRouter {
   static GoRouter router(AuthProvider authProvider, {ProfileProvider? profileProvider}) => GoRouter(
@@ -41,7 +46,7 @@ class AppRouter {
       final isAuthRoute = loc == '/login' || loc == '/signup' || loc == '/forgot-password';
       final isPublic = loc == '/' || loc == '/privacy' || loc == '/terms' || isAuthRoute;
 
-      if (!loggedIn && !isPublic && loc != '/diagnostics') return '/login';
+      if (!loggedIn && !isPublic) return '/login';
       if (loggedIn && (loc == '/' || isAuthRoute)) return '/browse';
 
       // Logged-in users with an incomplete profile are funneled to the
@@ -83,11 +88,14 @@ class AppRouter {
       GoRoute(path: '/privacy', builder: (_, __) => const PrivacyScreen()),
       GoRoute(path: '/terms', builder: (_, __) => const TermsScreen()),
       GoRoute(path: '/admin', builder: (_, __) => const AdminScreen()),
-      GoRoute(
-        path: '/admin/diagnostics',
-        builder: (_, __) => const DiagnosticsScreen(),
-      ),
       GoRoute(path: '/welcome', builder: (_, __) => const OnboardingScreen()),
+      GoRoute(path: '/welcome-letter', builder: (_, __) => const WelcomeLetterScreen()),
+      GoRoute(path: '/about', builder: (_, __) => const AboutScreen()),
+      GoRoute(path: '/about/letter', builder: (_, __) => const FounderLetterScreen()),
+      GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
+      GoRoute(path: '/notifications/settings',
+          builder: (_, __) => const NotificationSettingsScreen()),
+      GoRoute(path: '/stories', builder: (_, __) => const SuccessStoriesScreen()),
       GoRoute(
         path: '/messages/:id',
         builder: (context, state) => ChangeNotifierProvider.value(

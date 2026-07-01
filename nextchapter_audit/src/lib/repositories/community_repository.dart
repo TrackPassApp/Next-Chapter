@@ -8,6 +8,8 @@ class ChatRoom {
   final String? description;
   final String category;
   final int sortOrder;
+  final String? rules;
+  final bool isLocked;
 
   ChatRoom({
     required this.id,
@@ -16,6 +18,8 @@ class ChatRoom {
     this.description,
     required this.category,
     required this.sortOrder,
+    this.rules,
+    this.isLocked = false,
   });
 
   factory ChatRoom.fromMap(Map<String, dynamic> m) => ChatRoom(
@@ -25,6 +29,8 @@ class ChatRoom {
         description: m['description'] as String?,
         category: (m['category'] as String?) ?? 'general',
         sortOrder: (m['sort_order'] as int?) ?? 100,
+        rules: m['rules'] as String?,
+        isLocked: (m['is_locked'] as bool?) ?? false,
       );
 }
 

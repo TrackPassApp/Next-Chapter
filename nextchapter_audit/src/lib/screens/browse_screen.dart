@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../providers/block_provider.dart';
 import '../providers/browse_provider.dart';
 import '../theme/theme.dart';
+import '../widgets/common/notifications_bell.dart';
 import '../widgets/common/profile_card.dart';
 import '../widgets/common/filter_sheet.dart';
 import '../widgets/common/ad_placeholder.dart';
@@ -99,6 +100,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
               icon: Icon(Icons.clear, size: AppTheme.iconSm, color: appColors.danger),
               label: Text('Clear', style: text.labelMedium?.copyWith(color: appColors.danger)),
             ),
+          const NotificationsBell(),
         ],
       ),
       body: Column(

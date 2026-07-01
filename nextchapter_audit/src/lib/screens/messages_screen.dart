@@ -7,6 +7,7 @@ import '../theme/theme.dart';
 import '../widgets/common/ad_banner.dart';
 import '../widgets/common/conversation_tile.dart';
 import '../widgets/common/my_avatar_leading.dart';
+import '../widgets/common/notifications_bell.dart';
 import '../widgets/support/support_next_chapter_card.dart';
 
 class MessagesScreen extends StatefulWidget {
@@ -43,14 +44,15 @@ class _MessagesScreenState extends State<MessagesScreen> {
         title: const Text('Messages'),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: AppTheme.spacingMd),
+            padding: const EdgeInsets.only(right: AppTheme.spacingSm),
             child: Center(
               child: Text(
-                'Free & unlimited messaging',
+                'Free & unlimited',
                 style: text.labelSmall?.copyWith(color: appColors.success),
               ),
             ),
           ),
+          const NotificationsBell(),
         ],
       ),
       body: Center(

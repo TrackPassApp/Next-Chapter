@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
@@ -157,6 +158,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
       await profileProvider.loadProfile(userId);
       if (!mounted) return;
+
+      // Show the one-time Founder Letter after the very first onboarding
+      // completion. Keyed by user_id so it never re-shows for this user on
+      // this device.
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'founder_letter_seen_$userId';
+      final alreadySeen = prefs.getBool(key) ?? false;
+      if (!alreadySeen) {
+        await prefs.setBool(key, true);
+        if (!mounted) return;
+        context.go('/welcome-letter');
+        return;
+      }
       context.go('/browse');
     } catch (e) {
       setState(() => _error = 'Could not save your profile. $e');

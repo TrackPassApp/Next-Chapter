@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../providers/community_provider.dart';
 import '../providers/profile_provider.dart';
 import '../repositories/community_repository.dart';
+import '../services/supabase_service.dart';
 import '../theme/theme.dart';
 
 /// Individual room chat view. No ads inside the message stream.
@@ -21,6 +22,27 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
   ChatRoom? _room;
+  List<Map<String, dynamic>> _pinned = [];
+
+  Future<void> _loadPinned(String roomId) async {
+    final client = SupabaseService.client;
+    if (client == null) return;
+    try {
+      final rows = await client
+          .from('room_pinned_messages')
+          .select(
+            'message_id, pinned_at,'
+            ' msg:room_messages!room_pinned_messages_message_id_fkey('
+            '   id, body, deleted_at,'
+            '   sender:profiles!room_messages_sender_id_fkey(first_name)'
+            ' )',
+          )
+          .eq('room_id', roomId)
+          .order('pinned_at', ascending: false);
+      _pinned = List<Map<String, dynamic>>.from(rows as List);
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
 
   @override
   void initState() {
@@ -43,6 +65,7 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
       );
       if (_room != null && _room!.id.isNotEmpty) {
         await provider.openRoom(_room!.id);
+        await _loadPinned(_room!.id);
         _scrollToEnd();
       }
       if (mounted) setState(() {});
@@ -148,6 +171,7 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
       ),
       body: Column(
         children: [
+          if (_room != null) _RoomHeader(room: _room!, pinned: _pinned),
           Expanded(
             child: provider.loadingMessages
                 ? const Center(child: CircularProgressIndicator())
@@ -341,3 +365,127 @@ class _RoomMessageTile extends StatelessWidget {
     );
   }
 }
+
+class _RoomHeader extends StatefulWidget {
+  final ChatRoom room;
+  final List<Map<String, dynamic>> pinned;
+  const _RoomHeader({required this.room, required this.pinned});
+
+  @override
+  State<_RoomHeader> createState() => _RoomHeaderState();
+}
+
+class _RoomHeaderState extends State<_RoomHeader> {
+  bool _rulesOpen = false;
+  bool _pinnedOpen = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final text = theme.textTheme;
+    final appColors = theme.extension<AppColorsExtension>()!;
+
+    final visiblePinned = widget.pinned.where((p) {
+      final msg = p['msg'] as Map?;
+      if (msg == null) return false;
+      return msg['deleted_at'] == null;
+    }).toList();
+
+    return Container(
+      color: colors.surface,
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spacingMd, vertical: AppTheme.spacingSm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.room.description != null &&
+              widget.room.description!.isNotEmpty)
+            Text(widget.room.description!,
+                style: text.bodySmall
+                    ?.copyWith(color: appColors.subtleText)),
+          if ((widget.room.description ?? '').isNotEmpty)
+            const SizedBox(height: 4),
+          Row(children: [
+            InkWell(
+              onTap: () => setState(() => _rulesOpen = !_rulesOpen),
+              child: Chip(
+                avatar: Icon(Icons.gavel,
+                    size: 14, color: appColors.subtleText),
+                label: Text(_rulesOpen ? 'Hide rules' : 'Rules',
+                    style: text.labelSmall),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            if (visiblePinned.isNotEmpty) ...[
+              const SizedBox(width: AppTheme.spacingSm),
+              InkWell(
+                onTap: () => setState(() => _pinnedOpen = !_pinnedOpen),
+                child: Chip(
+                  avatar: Icon(Icons.push_pin,
+                      size: 14, color: colors.primary),
+                  label: Text(
+                      '${visiblePinned.length} pinned',
+                      style: text.labelSmall
+                          ?.copyWith(color: colors.primary)),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ]),
+          if (_rulesOpen) ...[
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spacingSm),
+              decoration: BoxDecoration(
+                color: colors.surfaceContainerLow,
+                borderRadius:
+                    BorderRadius.circular(AppTheme.radiusSmall),
+                border: Border.all(
+                    color: colors.outlineVariant.withOpacity(0.3)),
+              ),
+              child: Text(
+                  widget.room.rules ??
+                      'Be kind. No spam. No hate. Report anything that feels off.',
+                  style: text.bodySmall),
+            ),
+          ],
+          if (_pinnedOpen && visiblePinned.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            for (final pin in visiblePinned)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.spacingSm, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: colors.primaryContainer.withOpacity(0.35),
+                    borderRadius:
+                        BorderRadius.circular(AppTheme.radiusSmall),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.push_pin,
+                          size: 14, color: colors.primary),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          '${(pin['msg']?['sender']?['first_name']) ?? 'Member'}: ${pin['msg']?['body'] ?? ''}',
+                          style: text.bodySmall?.copyWith(
+                              color: colors.onPrimaryContainer),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
