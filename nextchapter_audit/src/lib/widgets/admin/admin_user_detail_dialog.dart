@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../repositories/admin_repository.dart';
 import '../../repositories/verification_repository.dart';
 import '../../services/supabase_service.dart';
@@ -177,57 +179,75 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Actions row.
-                Wrap(
-                  spacing: AppTheme.spacingSm,
-                  runSpacing: AppTheme.spacingSm,
-                  children: [
-                    if (!isSuspended)
-                      _ActionButton(
-                        label: 'Suspend',
-                        icon: Icons.person_off_outlined,
-                        color: appColors.danger,
-                        disabled: _busy,
-                        onPressed: () => _runAction(
-                          'Suspend user',
-                          () => AdminRepository.instance.suspendUser(widget.profileId, reason: null),
-                        ),
-                      )
-                    else
-                      _ActionButton(
-                        label: 'Unsuspend',
-                        icon: Icons.person_outline,
-                        color: appColors.success,
-                        disabled: _busy,
-                        onPressed: () => _runAction(
-                          'Unsuspend user',
-                          () => AdminRepository.instance.unsuspendUser(widget.profileId, reason: null),
-                        ),
-                      ),
-                    if (!isDeleted)
-                      _ActionButton(
-                        label: 'Soft Delete',
-                        icon: Icons.delete_outline,
-                        color: appColors.warning,
-                        disabled: _busy,
-                        onPressed: () => _runAction(
-                          'Soft delete user',
-                          () => AdminRepository.instance.softDeleteUser(widget.profileId, reason: null),
-                        ),
-                      )
-                    else
-                      _ActionButton(
-                        label: 'Restore',
-                        icon: Icons.restore,
-                        color: appColors.success,
-                        disabled: _busy,
-                        onPressed: () => _runAction(
-                          'Restore user',
-                          () => AdminRepository.instance.restoreUser(widget.profileId, reason: null),
-                        ),
-                      ),
-                  ],
-                ),
+                // Actions row. Destructive user actions are only available
+                // to admin / super_admin — moderators see them but disabled.
+                Consumer<AuthProvider>(builder: (context, auth, __) {
+                  final canAdmin = auth.canAdmin;
+                  final disabledTooltip = canAdmin
+                      ? null
+                      : 'Requires admin role — moderators cannot suspend or delete users.';
+                  Widget wrap(Widget child) => canAdmin
+                      ? child
+                      : Tooltip(message: disabledTooltip!, child: child);
+                  return Wrap(
+                    spacing: AppTheme.spacingSm,
+                    runSpacing: AppTheme.spacingSm,
+                    children: [
+                      if (!isSuspended)
+                        wrap(_ActionButton(
+                          label: 'Suspend',
+                          icon: Icons.person_off_outlined,
+                          color: appColors.danger,
+                          disabled: _busy || !canAdmin,
+                          onPressed: canAdmin
+                              ? () => _runAction(
+                                    'Suspend user',
+                                    () => AdminRepository.instance.suspendUser(widget.profileId, reason: null),
+                                  )
+                              : null,
+                        ))
+                      else
+                        wrap(_ActionButton(
+                          label: 'Unsuspend',
+                          icon: Icons.person_outline,
+                          color: appColors.success,
+                          disabled: _busy || !canAdmin,
+                          onPressed: canAdmin
+                              ? () => _runAction(
+                                    'Unsuspend user',
+                                    () => AdminRepository.instance.unsuspendUser(widget.profileId, reason: null),
+                                  )
+                              : null,
+                        )),
+                      if (!isDeleted)
+                        wrap(_ActionButton(
+                          label: 'Soft Delete',
+                          icon: Icons.delete_outline,
+                          color: appColors.warning,
+                          disabled: _busy || !canAdmin,
+                          onPressed: canAdmin
+                              ? () => _runAction(
+                                    'Soft delete user',
+                                    () => AdminRepository.instance.softDeleteUser(widget.profileId, reason: null),
+                                  )
+                              : null,
+                        ))
+                      else
+                        wrap(_ActionButton(
+                          label: 'Restore',
+                          icon: Icons.restore,
+                          color: appColors.success,
+                          disabled: _busy || !canAdmin,
+                          onPressed: canAdmin
+                              ? () => _runAction(
+                                    'Restore user',
+                                    () => AdminRepository.instance.restoreUser(widget.profileId, reason: null),
+                                  )
+                              : null,
+                        )),
+                    ],
+                  );
+                }),
                 const SizedBox(height: AppTheme.spacingLg),
 
                 _SectionHeader(label: 'Verification status'),
@@ -320,7 +340,7 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool disabled;
   const _ActionButton({required this.label, required this.icon, required this.color, required this.onPressed, this.disabled = false});
 

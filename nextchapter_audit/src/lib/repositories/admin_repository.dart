@@ -174,4 +174,33 @@ class AdminRepository {
         .limit(limit);
     return List<Map<String, dynamic>>.from(rows as List);
   }
+
+  // ─── Role management (super_admin only) ─────────────────────────────────
+
+  /// Rows: { user_id, role, granted_at, granted_by, notes, email }.
+  Future<List<Map<String, dynamic>>> listAdmins() async {
+    final db = SupabaseService.client;
+    if (db == null) return [];
+    final res = await db.rpc('admin_list_admins');
+    return List<Map<String, dynamic>>.from(res as List? ?? const []);
+  }
+
+  Future<void> grantRole(String userId, String newRole, {String? reason}) async {
+    final db = SupabaseService.client;
+    if (db == null) return;
+    await db.rpc('admin_grant_role', params: {
+      'target_user_id': userId,
+      'new_role': newRole,
+      'reason': reason,
+    });
+  }
+
+  Future<void> revokeRole(String userId, {String? reason}) async {
+    final db = SupabaseService.client;
+    if (db == null) return;
+    await db.rpc('admin_revoke_role', params: {
+      'target_user_id': userId,
+      'reason': reason,
+    });
+  }
 }

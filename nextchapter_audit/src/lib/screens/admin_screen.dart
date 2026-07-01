@@ -9,6 +9,7 @@ import '../widgets/admin/admin_users_tab.dart';
 import '../widgets/admin/admin_reports_tab.dart';
 import '../widgets/admin/admin_verification_tab.dart';
 import '../widgets/admin/admin_log_tab.dart';
+import '../widgets/admin/admin_roles_tab.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
@@ -32,16 +33,36 @@ class AdminScreen extends StatelessWidget {
 
     // Defence-in-depth admin guard. The router already redirects non-admins,
     // but if this screen ever renders without the role, refuse.
-    if (!auth.isAdmin) {
+    if (!auth.canModerate) {
       return _GuardScreen(
         title: 'Forbidden',
-        message: 'This screen is restricted to platform administrators.',
+        message: 'This screen is restricted to platform administrators and moderators.',
         icon: Icons.lock_outline,
       );
     }
 
+    // Role-adaptive tab set.
+    final tabs = <Tab>[
+      const Tab(icon: Icon(Icons.dashboard_outlined),    text: 'Overview'),
+      const Tab(icon: Icon(Icons.people_outline),        text: 'Users'),
+      const Tab(icon: Icon(Icons.flag_outlined),         text: 'Reports'),
+      const Tab(icon: Icon(Icons.verified_outlined),     text: 'Verification'),
+      const Tab(icon: Icon(Icons.history),               text: 'Moderation Log'),
+      const Tab(icon: Icon(Icons.admin_panel_settings_outlined), text: 'Roles'),
+    ];
+    final pages = <Widget>[
+      const AdminMetricsTab(),
+      const AdminUsersTab(),
+      const AdminReportsTab(),
+      const AdminVerificationTab(),
+      const AdminLogTab(),
+      const AdminRolesTab(),
+    ];
+
+    final roleLabel = (auth.role ?? 'unknown').toUpperCase();
+
     return DefaultTabController(
-      length: 5,
+      length: tabs.length,
       child: Scaffold(
         appBar: AppBar(
           title: Row(
@@ -55,7 +76,14 @@ class AdminScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                   border: Border.all(color: appColors.danger.withOpacity(0.3)),
                 ),
-                child: Text('ADMIN', style: text.labelSmall?.copyWith(color: appColors.danger, fontWeight: FontWeight.w700)),
+                child: Text(
+                  roleLabel,
+                  style: text.labelSmall?.copyWith(
+                    color: appColors.danger,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
               ),
             ],
           ),
@@ -68,30 +96,16 @@ class AdminScreen extends StatelessWidget {
             const SizedBox(width: AppTheme.spacingMd),
           ],
           bottom: TabBar(
-            isScrollable: false,
+            isScrollable: true,
             labelColor: colors.primary,
             unselectedLabelColor: colors.onSurfaceVariant,
             indicatorColor: colors.primary,
-            tabs: const [
-              Tab(icon: Icon(Icons.dashboard_outlined), text: 'Overview'),
-              Tab(icon: Icon(Icons.people_outline), text: 'Users'),
-              Tab(icon: Icon(Icons.flag_outlined), text: 'Reports'),
-              Tab(icon: Icon(Icons.verified_outlined), text: 'Verification'),
-              Tab(icon: Icon(Icons.history), text: 'Moderation Log'),
-            ],
+            tabs: tabs,
           ),
         ),
-        body: const Padding(
-          padding: EdgeInsets.all(AppTheme.spacingMd),
-          child: TabBarView(
-            children: [
-              AdminMetricsTab(),
-              AdminUsersTab(),
-              AdminReportsTab(),
-              AdminVerificationTab(),
-              AdminLogTab(),
-            ],
-          ),
+        body: Padding(
+          padding: const EdgeInsets.all(AppTheme.spacingMd),
+          child: TabBarView(children: pages),
         ),
       ),
     );

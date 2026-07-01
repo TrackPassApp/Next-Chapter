@@ -67,12 +67,9 @@ class AppRouter {
         } catch (_) {}
       }
 
-      if (loc == '/admin' && !authProvider.isAdmin) {
+      if (loc.startsWith('/admin') && !authProvider.canModerate) {
         return loggedIn ? '/browse' : '/login';
       }
-
-      // /diagnostics is intentionally open to anyone (logged-in or not) so
-      // users can capture and share a report when something is broken.
 
       return null;
     },
@@ -84,8 +81,11 @@ class AppRouter {
       GoRoute(path: '/privacy', builder: (_, __) => const PrivacyScreen()),
       GoRoute(path: '/terms', builder: (_, __) => const TermsScreen()),
       GoRoute(path: '/admin', builder: (_, __) => const AdminScreen()),
+      GoRoute(
+        path: '/admin/diagnostics',
+        builder: (_, __) => const DiagnosticsScreen(),
+      ),
       GoRoute(path: '/welcome', builder: (_, __) => const OnboardingScreen()),
-      GoRoute(path: '/diagnostics', builder: (_, __) => const DiagnosticsScreen()),
       GoRoute(
         path: '/messages/:id',
         builder: (context, state) => ChangeNotifierProvider.value(

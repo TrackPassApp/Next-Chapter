@@ -72,6 +72,25 @@ class AuthProvider extends ChangeNotifier {
         role == 'moderator';
   }
 
+  /// Raw role string from JWT app_metadata (server-controlled).
+  /// One of 'super_admin' | 'admin' | 'moderator' | null.
+  String? get role {
+    if (_isMockMode) return _mockIsAdmin ? 'admin' : null;
+    final r = _user?.appMetadata['role'];
+    return (r is String && r.isNotEmpty) ? r : null;
+  }
+
+  /// Any tier — can enter the admin dashboard and view everything.
+  bool get canModerate =>
+      role == 'moderator' || role == 'admin' || role == 'super_admin';
+
+  /// admin + super_admin — can suspend/delete users and edit verification.
+  /// Moderators cannot perform destructive user actions.
+  bool get canAdmin => role == 'admin' || role == 'super_admin';
+
+  /// super_admin only — can grant/revoke moderator + admin roles.
+  bool get isSuperAdmin => role == 'super_admin';
+
   bool get isEmailVerified {
     if (_isMockMode) return true;
     return _user?.emailConfirmedAt != null;

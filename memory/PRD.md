@@ -35,7 +35,18 @@ Pivot 3 (Msg ~430): Stop all batches; perform a **full code-level repair audit**
 - [ ] **B12** End-to-end smoke test + polish
 
 ## Stabilization / Repair Log
-- 2026-06-30 — **FullRepair-2026-06-30** (build stamp `20260630163623`)
+- 2026-07-01 — **AdminFix-2026-07-01** (build stamp latest)
+  - Migration 011 introduces the role hierarchy: `super_admin > admin > moderator`.
+  - New Postgres helpers: `jwt_role()`, `is_moderator_or_above()`, `is_admin_or_above()`, `is_super_admin()`. Suspend / unsuspend / soft_delete / restore RPCs now require `is_admin_or_above()`; moderators can only view + resolve reports + moderate verification.
+  - New RPCs: `admin_list_admins()`, `admin_grant_role()`, `admin_revoke_role()`, `admin_my_role()`. All role writes are super_admin-only server-side.
+  - AuthProvider exposes `role`, `canModerate`, `canAdmin`, `isSuperAdmin`.
+  - AdminScreen: new **Roles** tab (super_admin can grant/revoke moderators/admins); tabs now scroll horizontally when there are 6.
+  - AdminUserDetailDialog: destructive user buttons disabled with tooltip for moderators.
+  - Settings gains a "Moderation" section that only appears for admins/moderators, containing "Admin Dashboard (<ROLE>)" and "Diagnostics" links.
+  - `/diagnostics` route removed from the public router; replaced with admin-only `/admin/diagnostics`.
+  - Public build-label overlay removed from `index.html`. Debug pill removed from ProfileDetail header. `AppConfig.buildLabel` remains only as an internal string on the diagnostics page.
+- 2026-07-01 — **ScaffoldFix-2026-07-01**: nested-Scaffold layout bug fixed; ProfileDetailScreen returns a Material→SafeArea→Column layout that lives inside the AppShell's single Scaffold. Confirmed working by user.
+- 2026-06-30 — see prior entries.
   - Profile Detail rewritten (Scaffold + ListView; UUID guard; always-render sections with empty-state hints; new `_NoPhotoPlaceholder`; build pill in app bar).
   - My Profile reuses ProfileDetailScreen — never blank, even for sparse data.
   - Router: legacy `/profile/:id` redirects to canonical `/browse/profile/:id`; non-UUID ids bounce to `/browse`.
