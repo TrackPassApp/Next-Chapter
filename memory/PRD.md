@@ -35,6 +35,7 @@ Pivot 3 (Msg ~430): Stop all batches; perform a **full code-level repair audit**
 - [ ] **B12** End-to-end smoke test + polish
 
 ## Stabilization / Repair Log
+- 2026-07-01 — **Stabilization audit** (`013_fix_admin_review_verification_request.sql`): grep-based audit of all completed areas surfaced exactly one clear bug — `admin_review_verification_request()` in 006 still guarded on bare `is_admin()`, which would 42725 the moment an admin approves/rejects a submitted verification. Migration 013 redefines it with `is_moderator_or_above()`; body otherwise byte-identical to 006. Everything else (mock data, routes, RLS on child tables, block/report flow, dart analyze) came back clean.
 - 2026-07-01 — **AdminFix-2026-07-01** (build stamp latest)
   - Migration 011 introduces the role hierarchy: `super_admin > admin > moderator`.
   - New Postgres helpers: `jwt_role()`, `is_moderator_or_above()`, `is_admin_or_above()`, `is_super_admin()`. Suspend / unsuspend / soft_delete / restore RPCs now require `is_admin_or_above()`; moderators can only view + resolve reports + moderate verification.
