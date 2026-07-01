@@ -30,12 +30,19 @@ Pivot 3 (Msg ~430): Stop all batches; perform a **full code-level repair audit**
 - [x] **B7** Admin Dashboard
 - [x] **B8** Verification UI
 - [x] **B9** Demo community + 5-tab navigation
-- [ ] **B10** Privacy, safety, account deletion pipeline
+- [x] **B10** Privacy, safety, account deletion pipeline (2026-07-01, awaits user-run migration 014 + live smoke test)
 - [ ] **B11** Monetization placeholders (ad slot, donation tile)
 - [ ] **B12** End-to-end smoke test + polish
 
 ## Stabilization / Repair Log
-- 2026-07-01 — **Stabilization audit** (`013_fix_admin_review_verification_request.sql`): grep-based audit of all completed areas surfaced exactly one clear bug — `admin_review_verification_request()` in 006 still guarded on bare `is_admin()`, which would 42725 the moment an admin approves/rejects a submitted verification. Migration 013 redefines it with `is_moderator_or_above()`; body otherwise byte-identical to 006. Everything else (mock data, routes, RLS on child tables, block/report flow, dart analyze) came back clean.
+- 2026-07-01 — **B10 Account Deletion Pipeline** (`014_account_deletion.sql`, `settings_screen.dart`, released as build `B10-20260701163651`):
+  - New user-callable RPC `public.request_account_deletion(reason text default null)` (SECURITY DEFINER):
+    flips `profiles.is_deleted=true`, sets `deleted_at=now()`, `is_complete=false`; redacts PII (`first_name → 'Deleted User'`, `about_me/city/state` cleared); purges child rows on `profile_photos/prompts/interests/looking_for/life_situation`; writes `moderation_log` row with `action='self_delete'` + optional reason. Messages, conversations, reports, moderation_log are all preserved for admin history.
+  - New index `profiles_deleted_at_idx` scoped to `is_deleted=true` — feeds a future 30-day hard-delete cron. Cron NOT built per user directive.
+  - New RLS policy `profiles_select_admins` — `is_moderator_or_above()` bypass so soft-deleted users remain visible to admins/moderators in AdminUsersTab (which filters `deleted=true`) even though the regular `profiles_select_self_or_public` policy from 010 hides them from everyone else.
+  - Hardened `msg_insert_participants` — sender row now must have `coalesce(is_deleted,false)=false`, so a soft-deleted account cannot post new messages even if it still holds a valid session.
+  - `SettingsScreen._DeleteAccountDialog`: replaces the placeholder delete tile with a two-step dialog (Immediately / Kept for safety / After 30 days copy sections, optional reason, `I understand` checkbox + typed `DELETE` confirmation). Calls `request_account_deletion(reason)`, then `AuthProvider.logout()`, then `context.go('/')`.
+- 2026-07-01 — **Stabilization audit** (`013_fix_admin_review_verification_request.sql`): grep-based audit surfaced one bug — `admin_review_verification_request()` in 006 still guarded on bare `is_admin()`, which 42725s when an admin approves/rejects. 013 redefines it with `is_moderator_or_above()`.
 - 2026-07-01 — **AdminFix-2026-07-01** (build stamp latest)
   - Migration 011 introduces the role hierarchy: `super_admin > admin > moderator`.
   - New Postgres helpers: `jwt_role()`, `is_moderator_or_above()`, `is_admin_or_above()`, `is_super_admin()`. Suspend / unsuspend / soft_delete / restore RPCs now require `is_admin_or_above()`; moderators can only view + resolve reports + moderate verification.
@@ -80,7 +87,7 @@ Pivot 3 (Msg ~430): Stop all batches; perform a **full code-level repair audit**
 - `resetPasswordForEmail()` still uses deep-link redirect
 
 ## Required Migrations (in order)
-001_admin_role.sql · 002_b1_database_foundation.sql · 003_b5_messaging.sql · 004_b6_block_report.sql · 005_b7_admin.sql · 006_b8_verification.sql · 007_b9_demo_seed.sql · 008_cleanup_legacy_demos.sql · 009_fix_demo_photo_urls.sql
+001_admin_role.sql · 002_b1_database_foundation.sql · 003_b5_messaging.sql · 004_b6_block_report.sql · 005_b7_admin.sql · 006_b8_verification.sql · 007_b9_demo_seed.sql · 008_cleanup_legacy_demos.sql · 009_fix_demo_photo_urls.sql · 010_fix_profile_rls.sql · 011_admin_role_hierarchy.sql · 012_fix_duplicate_is_admin.sql · 013_fix_admin_review_verification_request.sql · 014_account_deletion.sql
 
 ## Critical Operating Rule (current)
 **No new feature batches** until the user confirms Profile Detail, My Profile, and Admin all render correctly on the FullRepair-2026-06-30 build.

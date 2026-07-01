@@ -217,67 +217,240 @@ class _DeleteAccountDialog extends StatefulWidget {
 
 class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
   bool _deleting = false;
+  bool _understand = false;
+  final _confirmCtrl = TextEditingController();
+  final _reasonCtrl = TextEditingController();
+  String? _error;
+
+  static const _confirmPhrase = 'DELETE';
+
+  bool get _canDelete =>
+      _understand &&
+      _confirmCtrl.text.trim().toUpperCase() == _confirmPhrase &&
+      !_deleting;
+
+  @override
+  void dispose() {
+    _confirmCtrl.dispose();
+    _reasonCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _delete() async {
-    setState(() => _deleting = true);
+    setState(() {
+      _deleting = true;
+      _error = null;
+    });
 
     final auth = context.read<AuthProvider>();
-    final profileProvider = context.read<ProfileProvider>();
+    final db = SupabaseService.client;
 
     try {
-      final userId = auth.userId;
-      if (userId != null) {
-        // Delete all profile data from Supabase (cascade deletes photos, interests, etc.)
-        await profileProvider.deleteAccount(userId);
+      if (db == null) {
+        throw StateError('Supabase is not connected.');
       }
+      // Server-authoritative soft delete. Redacts PII, purges photos + child
+      // rows, writes moderation_log 'self_delete'. See migration 014.
+      await db.rpc('request_account_deletion', params: {
+        'reason': _reasonCtrl.text.trim().isEmpty ? null : _reasonCtrl.text.trim(),
+      });
       await auth.logout();
-    } catch (_) {
-      // Even if DB deletion partially fails, sign the user out.
-      await auth.logout();
-    }
-
-    if (mounted) {
+      if (!mounted) return;
       Navigator.pop(context);
       context.go('/');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _deleting = false;
+        _error = 'Could not delete account: $e';
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final appColors = widget.appColors;
+    final text = widget.text;
+    final colors = widget.colors;
+
     return AlertDialog(
-      title: Text('Delete Account?', style: widget.text.titleLarge),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('This will permanently remove:', style: widget.text.bodyMedium),
-          const SizedBox(height: AppTheme.spacingSm),
-          ...['Your profile and photos', 'All messages and conversations', 'All personal data'].map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: AppTheme.spacingXs),
-              child: Row(children: [
-                Icon(Icons.remove_circle_outline, size: AppTheme.iconSm, color: widget.appColors.danger),
-                const SizedBox(width: AppTheme.spacingSm),
-                Text(item, style: widget.text.bodySmall),
-              ]),
-            ),
+      icon: Icon(Icons.warning_amber_rounded, color: appColors.danger, size: 40),
+      title: Text('Delete your account?', style: text.titleLarge),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'This is a serious, mostly-permanent action. Please read the '
+                'details below before confirming.',
+                style: text.bodyMedium,
+              ),
+              const SizedBox(height: AppTheme.spacingMd),
+
+              _Section(
+                title: 'Immediately',
+                icon: Icons.flash_on_outlined,
+                color: appColors.danger,
+                items: const [
+                  'Your profile, photos, prompts, interests, and other personal details are removed from the app.',
+                  'You are hidden from Browse and cannot appear in new matches.',
+                  'You cannot send new messages, and other users cannot start new conversations with you.',
+                  'You are signed out on this device.',
+                ],
+                textStyle: text,
+              ),
+              const SizedBox(height: AppTheme.spacingMd),
+
+              _Section(
+                title: 'Kept for safety (admin-only)',
+                icon: Icons.shield_outlined,
+                color: appColors.subtleText,
+                items: const [
+                  'Messages you sent stay visible to the people you sent them to and to platform moderators — needed to investigate reports.',
+                  'Reports filed by or against your account remain.',
+                  'The moderation log records that you self-deleted, when, and (if you shared it) why.',
+                ],
+                textStyle: text,
+              ),
+              const SizedBox(height: AppTheme.spacingMd),
+
+              _Section(
+                title: 'After 30 days',
+                icon: Icons.event_available_outlined,
+                color: appColors.subtleText,
+                items: const [
+                  'A future automated job will permanently erase all remaining traces of your account. Until then, an admin can recover the account only in response to a legal or safety request.',
+                ],
+                textStyle: text,
+              ),
+              const SizedBox(height: AppTheme.spacingLg),
+
+              TextField(
+                controller: _reasonCtrl,
+                enabled: !_deleting,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Reason (optional — helps us improve)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: AppTheme.spacingMd),
+
+              CheckboxListTile(
+                value: _understand,
+                onChanged: _deleting
+                    ? null
+                    : (v) => setState(() => _understand = v ?? false),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(
+                  'I understand this deletes my profile and I cannot log back into this account.',
+                  style: text.bodySmall,
+                ),
+              ),
+              const SizedBox(height: AppTheme.spacingSm),
+
+              Text('Type DELETE to confirm:', style: text.bodySmall),
+              const SizedBox(height: 4),
+              TextField(
+                controller: _confirmCtrl,
+                enabled: !_deleting && _understand,
+                textCapitalization: TextCapitalization.characters,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: _confirmPhrase,
+                  border: const OutlineInputBorder(),
+                  errorText: _confirmCtrl.text.isNotEmpty &&
+                          _confirmCtrl.text.trim().toUpperCase() != _confirmPhrase
+                      ? 'Must match exactly'
+                      : null,
+                ),
+              ),
+
+              if (_error != null) ...[
+                const SizedBox(height: AppTheme.spacingMd),
+                Container(
+                  padding: const EdgeInsets.all(AppTheme.spacingSm),
+                  decoration: BoxDecoration(
+                    color: appColors.danger.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                    border: Border.all(color: appColors.danger.withOpacity(0.3)),
+                  ),
+                  child: Text(_error!,
+                      style: text.bodySmall?.copyWith(color: appColors.danger)),
+                ),
+              ],
+            ],
           ),
-          const SizedBox(height: AppTheme.spacingMd),
-          Text('This action cannot be undone.', style: widget.text.bodySmall?.copyWith(color: widget.appColors.danger, fontWeight: FontWeight.w600)),
-        ],
+        ),
       ),
       actions: [
-        TextButton(onPressed: _deleting ? null : () => Navigator.pop(context), child: const Text('Cancel')),
-        ElevatedButton(
-          onPressed: _deleting ? null : _delete,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: widget.appColors.danger,
-            foregroundColor: widget.colors.onError,
-            minimumSize: const Size(80, 40),
+        TextButton(
+          onPressed: _deleting ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton.tonal(
+          onPressed: _canDelete ? _delete : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: appColors.danger,
+            foregroundColor: colors.onError,
+            disabledBackgroundColor: appColors.danger.withOpacity(0.3),
           ),
           child: _deleting
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Delete Account'),
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Delete my account'),
         ),
+      ],
+    );
+  }
+}
+
+class _Section extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final List<String> items;
+  final TextTheme textStyle;
+  const _Section({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.items,
+    required this.textStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Icon(icon, size: AppTheme.iconSm, color: color),
+          const SizedBox(width: AppTheme.spacingSm),
+          Text(title, style: textStyle.labelLarge?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          )),
+        ]),
+        const SizedBox(height: 4),
+        ...items.map((s) => Padding(
+              padding: const EdgeInsets.only(left: 28, top: 2, bottom: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('• ', style: textStyle.bodySmall),
+                  Expanded(child: Text(s, style: textStyle.bodySmall)),
+                ],
+              ),
+            )),
       ],
     );
   }

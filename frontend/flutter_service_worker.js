@@ -1,12 +1,11 @@
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    try {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
-      await self.registration.unregister();
-      const clients = await self.clients.matchAll({ type: 'window' });
-      for (const c of clients) { c.navigate(c.url); }
-    } catch (_) {}
+// Neutered service worker — self-uninstalls, never caches anything.
+self.addEventListener('install', function () { self.skipWaiting(); });
+self.addEventListener('activate', function (e) {
+  e.waitUntil((async () => {
+    var regs = await self.registration ? [self.registration] : [];
+    for (var r of regs) { try { await r.unregister(); } catch (_) {} }
+    var ks = await caches.keys();
+    for (var k of ks) { try { await caches.delete(k); } catch (_) {} }
   })());
 });
+self.addEventListener('fetch', function () {});
