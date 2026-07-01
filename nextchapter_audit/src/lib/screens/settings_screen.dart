@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../config/app_config.dart';
 import '../providers/auth_provider.dart';
 import '../providers/messages_provider.dart';
 import '../providers/profile_provider.dart';
@@ -54,6 +57,19 @@ class SettingsScreen extends StatelessWidget {
                     icon: Icons.auto_awesome_outlined,
                     title: 'Populate demo conversations',
                     onTap: () => _seedDemoConversations(context, appColors),
+                  ),
+                ],
+                colors: colors,
+                text: text,
+              ),
+              const SizedBox(height: AppTheme.spacingMd),
+              _SettingsSection(
+                title: 'Support Next Chapter',
+                children: [
+                  _SettingsTile(
+                    icon: Icons.volunteer_activism_outlined,
+                    title: 'Support Next Chapter',
+                    onTap: () => _showSupportDialog(context, colors, text, appColors),
                   ),
                 ],
                 colors: colors,
@@ -130,6 +146,13 @@ class SettingsScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (_) => _DeleteAccountDialog(colors: colors, text: text, appColors: appColors),
+    );
+  }
+
+  void _showSupportDialog(BuildContext context, ColorScheme colors, TextTheme text, AppColorsExtension appColors) {
+    showDialog(
+      context: context,
+      builder: (_) => _SupportDialog(colors: colors, text: text, appColors: appColors),
     );
   }
 
@@ -452,6 +475,178 @@ class _Section extends StatelessWidget {
               ),
             )),
       ],
+    );
+  }
+}
+
+
+class _SupportDialog extends StatelessWidget {
+  final ColorScheme colors;
+  final TextTheme text;
+  final AppColorsExtension appColors;
+
+  const _SupportDialog({
+    required this.colors,
+    required this.text,
+    required this.appColors,
+  });
+
+  Future<void> _launchDonate(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final url = AppConfig.donateUrl.trim();
+    if (url.isEmpty) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Donation link coming soon. Thanks for wanting to help!'),
+      ));
+      return;
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok) {
+      messenger.showSnackBar(SnackBar(content: Text('Could not open $url')));
+    }
+  }
+
+  Future<void> _copyLink(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final url = AppConfig.donateUrl.trim();
+    if (url.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: url));
+    if (!context.mounted) return;
+    messenger.showSnackBar(const SnackBar(content: Text('Link copied.')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasUrl = AppConfig.donateUrl.trim().isNotEmpty;
+
+    return AlertDialog(
+      icon: Icon(Icons.volunteer_activism_outlined,
+          color: colors.primary, size: 40),
+      title: Text('Support Next Chapter', style: text.titleLarge),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Free-forever pledge — this is the promise B11 must protect.
+              Container(
+                padding: const EdgeInsets.all(AppTheme.spacingMd),
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer.withOpacity(0.35),
+                  borderRadius:
+                      BorderRadius.circular(AppTheme.radiusSmall),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.chat_bubble_outline,
+                        size: AppTheme.iconSm, color: colors.primary),
+                    const SizedBox(width: AppTheme.spacingSm),
+                    Expanded(
+                      child: Text(
+                        'Messaging is 100% free — always. No paywalls, no '
+                        'subscriptions, no "pay to see who liked you".',
+                        style: text.bodySmall
+                            ?.copyWith(color: colors.onPrimaryContainer),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppTheme.spacingMd),
+
+              Text(
+                'Next Chapter is built and run by a tiny team. If you want to '
+                'chip in for hosting, moderation, and safety tools, a one-time '
+                'donation goes a long way.',
+                style: text.bodyMedium,
+              ),
+              const SizedBox(height: AppTheme.spacingSm),
+
+              _SupportRow(
+                icon: Icons.check_circle_outline,
+                label: 'One-time only — never a subscription.',
+                text: text,
+                color: appColors.subtleText,
+              ),
+              _SupportRow(
+                icon: Icons.check_circle_outline,
+                label: 'Donating never changes what you see or who sees you.',
+                text: text,
+                color: appColors.subtleText,
+              ),
+              _SupportRow(
+                icon: Icons.check_circle_outline,
+                label: 'Your data is never sold. Ever.',
+                text: text,
+                color: appColors.subtleText,
+              ),
+
+              if (!hasUrl) ...[
+                const SizedBox(height: AppTheme.spacingMd),
+                Text(
+                  'A donation link will appear here soon. Thanks for wanting '
+                  'to support the app.',
+                  style: text.bodySmall
+                      ?.copyWith(color: appColors.subtleText),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+        if (hasUrl)
+          TextButton.icon(
+            onPressed: () => _copyLink(context),
+            icon: const Icon(Icons.copy_outlined, size: AppTheme.iconSm),
+            label: const Text('Copy link'),
+          ),
+        FilledButton.icon(
+          onPressed: () => _launchDonate(context),
+          icon: const Icon(Icons.favorite_outline, size: AppTheme.iconSm),
+          label: Text(hasUrl ? 'Donate' : 'Notify me'),
+        ),
+      ],
+    );
+  }
+}
+
+class _SupportRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final TextTheme text;
+  final Color color;
+
+  const _SupportRow({
+    required this.icon,
+    required this.label,
+    required this.text,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: AppTheme.iconSm, color: color),
+          const SizedBox(width: AppTheme.spacingSm),
+          Expanded(
+            child: Text(label, style: text.bodySmall?.copyWith(color: color)),
+          ),
+        ],
+      ),
     );
   }
 }
