@@ -109,14 +109,22 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
     final appColors = theme.extension<AppColorsExtension>()!;
 
     if (_loading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Profile')),
+      return _shell(
+        colors: colors,
+        text: text,
+        titleText: 'Profile',
+        actions: const [],
+        bottomAction: null,
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_profile == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Profile')),
+      return _shell(
+        colors: colors,
+        text: text,
+        titleText: 'Profile',
+        actions: const [],
+        bottomAction: null,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(AppTheme.spacingLg),
@@ -125,9 +133,12 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
               children: [
                 Icon(Icons.person_off_outlined, size: 56, color: appColors.subtleText),
                 const SizedBox(height: AppTheme.spacingMd),
-                Text(_error ?? 'Profile not found', style: text.titleMedium),
+                Text(_error ?? 'Profile not found', style: text.titleMedium, textAlign: TextAlign.center),
                 const SizedBox(height: AppTheme.spacingMd),
-                ElevatedButton(onPressed: () => context.go('/browse'), child: const Text('Back to Browse')),
+                ElevatedButton(
+                  onPressed: () => context.go('/browse'),
+                  child: const Text('Back to Browse'),
+                ),
               ],
             ),
           ),
@@ -141,126 +152,161 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
     final photos = profile.photoUrls;
     final currentPhoto = photos.isNotEmpty ? photos[_photoIndex.clamp(0, photos.length - 1)] : null;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(isOwn ? 'My Profile' : 'Profile'),
-            const SizedBox(width: AppTheme.spacingSm),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: colors.primaryContainer,
-                borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+    // Body scrolls independently inside the shell — NO inner Scaffold,
+    // NO inner bottomNavigationBar. The outer AppShell's Scaffold already
+    // owns the outermost Material + 5-tab navigation bar; nesting a second
+    // Scaffold here previously starved the body slot of constraints and
+    // silently collapsed every child (including a 100 px red debug box).
+    final bodyList = ListView(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spacingMd,
+        vertical: AppTheme.spacingMd,
+      ),
+      children: _buildBody(
+        context: context,
+        profile: profile,
+        isOwn: isOwn,
+        photos: photos,
+        currentPhoto: currentPhoto,
+        colors: colors,
+        text: text,
+        appColors: appColors,
+      ),
+    );
+
+    final bodyWithErrorTrap = Builder(builder: (context) {
+      try {
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: bodyList,
+          ),
+        );
+      } catch (e, st) {
+        return _InlineError(error: e, stack: st, appColors: appColors, text: text);
+      }
+    });
+
+    return _shell(
+      colors: colors,
+      text: text,
+      titleText: isOwn ? 'My Profile' : 'Profile',
+      actions: isOwn
+          ? [
+              IconButton(
+                tooltip: 'Edit profile',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () => context.push('/me/edit').then((_) => _load()),
               ),
-              child: Text(
-                AppConfig.buildLabel,
-                style: text.labelSmall?.copyWith(
-                  color: colors.onPrimaryContainer,
-                  fontWeight: FontWeight.w600,
-                ),
+            ]
+          : [
+              Consumer<BlockProvider>(
+                builder: (_, blockProvider, __) {
+                  final blocked = blockProvider.hasBlocked(profile.id);
+                  return PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert),
+                    onSelected: (v) => _onMenu(v, profile, appColors, colors, blocked: blocked),
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(
+                        value: 'report',
+                        child: Row(children: [
+                          Icon(Icons.flag_outlined, size: 20),
+                          SizedBox(width: 8),
+                          Text('Report'),
+                        ]),
+                      ),
+                      PopupMenuItem(
+                        value: blocked ? 'unblock' : 'block',
+                        child: Row(children: [
+                          Icon(blocked ? Icons.lock_open : Icons.block, size: 20),
+                          const SizedBox(width: 8),
+                          Text(blocked ? 'Unblock' : 'Block'),
+                        ]),
+                      ),
+                    ],
+                  );
+                },
               ),
-            ),
-          ],
-        ),
-        actions: [
-          if (isOwn)
-            IconButton(
-              tooltip: 'Edit profile',
+            ],
+      bottomAction: isOwn
+          ? ElevatedButton.icon(
+              onPressed: () {
+                if (!profile.isComplete) {
+                  context.go('/welcome');
+                } else {
+                  context.push('/me/edit').then((_) => _load());
+                }
+              },
               icon: const Icon(Icons.edit_outlined),
-              onPressed: () => context.push('/me/edit').then((_) => _load()),
+              label: Text(profile.isComplete ? 'Edit Profile' : 'Complete Profile'),
             )
-          else
-            Consumer<BlockProvider>(
+          : Consumer<BlockProvider>(
               builder: (_, blockProvider, __) {
                 final blocked = blockProvider.hasBlocked(profile.id);
-                return PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert),
-                  onSelected: (v) => _onMenu(v, profile, appColors, colors, blocked: blocked),
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(value: 'report', child: Row(children: [Icon(Icons.flag_outlined, size: 20), SizedBox(width: 8), Text('Report')])),
-                    PopupMenuItem(
-                      value: blocked ? 'unblock' : 'block',
-                      child: Row(children: [
-                        Icon(blocked ? Icons.lock_open : Icons.block, size: 20),
-                        const SizedBox(width: 8),
-                        Text(blocked ? 'Unblock' : 'Block'),
-                      ]),
-                    ),
-                  ],
+                if (blocked) {
+                  return OutlinedButton.icon(
+                    onPressed: () => _confirmUnblock(profile),
+                    icon: const Icon(Icons.lock_open),
+                    label: Text('Unblock ${profile.firstName} to message'),
+                  );
+                }
+                return ElevatedButton.icon(
+                  onPressed: () => _openConversation(profile),
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  label: Text('Message ${profile.firstName} — Free'),
                 );
               },
             ),
-        ],
-      ),
-      body: Builder(
-        builder: (context) {
-          // Any exception thrown by any widget below this Builder is caught
-          // here and rendered as a big red panel on the screen so it can
-          // never silently blank out the body again. This runs in profile
-          // and release mode, not just debug.
-          try {
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 720),
-                child: ListView(
-                  padding: const EdgeInsets.all(AppTheme.spacingMd),
-                  children: _buildBody(
-                    context: context,
-                    profile: profile,
-                    isOwn: isOwn,
-                    photos: photos,
-                    currentPhoto: currentPhoto,
-                    colors: colors,
-                    text: text,
-                    appColors: appColors,
+      body: bodyWithErrorTrap,
+    );
+  }
+
+  /// The custom in-branch layout that REPLACES the nested Scaffold.
+  ///
+  /// Structure: `Column( _Header, Expanded(body), _BottomAction )`.
+  /// This is a plain widget — no Scaffold, no bottomNavigationBar — so it
+  /// cannot fight the outer AppShell's Scaffold for layout constraints.
+  /// The outer AppShell still provides the 5-tab bottom nav and the safe
+  /// area at the bottom; we only add our own top header (back arrow + title
+  /// + build pill + actions) and the fixed Message / Edit action button.
+  Widget _shell({
+    required ColorScheme colors,
+    required TextTheme text,
+    required String titleText,
+    required List<Widget> actions,
+    required Widget? bottomAction,
+    required Widget body,
+  }) {
+    return Material(
+      color: colors.surface,
+      child: SafeArea(
+        top: true,
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _ProfileHeader(
+              titleText: titleText,
+              actions: actions,
+              colors: colors,
+              text: text,
+            ),
+            Expanded(child: body),
+            if (bottomAction != null)
+              Container(
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  border: Border(top: BorderSide(color: colors.outlineVariant, width: 0.5)),
+                ),
+                padding: const EdgeInsets.all(AppTheme.spacingMd),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: SizedBox(width: double.infinity, child: bottomAction),
                   ),
                 ),
               ),
-            );
-          } catch (e, st) {
-            return _InlineError(error: e, stack: st, appColors: appColors, text: text);
-          }
-        },
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.spacingMd),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: isOwn
-                  ? ElevatedButton.icon(
-                      onPressed: () {
-                        if (!profile.isComplete) {
-                          context.go('/welcome');
-                        } else {
-                          context.push('/me/edit').then((_) => _load());
-                        }
-                      },
-                      icon: const Icon(Icons.edit_outlined),
-                      label: Text(profile.isComplete ? 'Edit Profile' : 'Complete Profile'),
-                    )
-                  : Consumer<BlockProvider>(
-                      builder: (_, blockProvider, __) {
-                        final blocked = blockProvider.hasBlocked(profile.id);
-                        if (blocked) {
-                          return OutlinedButton.icon(
-                            onPressed: () => _confirmUnblock(profile),
-                            icon: const Icon(Icons.lock_open),
-                            label: Text('Unblock ${profile.firstName} to message'),
-                          );
-                        }
-                        return ElevatedButton.icon(
-                          onPressed: () => _openConversation(profile),
-                          icon: const Icon(Icons.chat_bubble_outline),
-                          label: Text('Message ${profile.firstName} — Free'),
-                        );
-                      },
-                    ),
-            ),
-          ),
+          ],
         ),
       ),
     );
@@ -326,21 +372,6 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
   }) {
     final validCurrent = _safeImageUrl(currentPhoto);
     return [
-      // DEBUG PROBE — a plain red 100-tall Container inserted as the first
-      // child of the profile ListView. If this box does not show up when
-      // opening a profile, the ListView itself is not being reached (which
-      // points at a nested-Scaffold layout bug) and we will drop the inner
-      // Scaffold entirely.
-      Container(
-        height: 100,
-        margin: const EdgeInsets.only(bottom: 8),
-        color: const Color(0xFFFF1744),
-        alignment: Alignment.center,
-        child: const Text(
-          'DEBUG PROBE — profile body reached',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-        ),
-      ),
       // Main photo.
       AspectRatio(
         aspectRatio: 4 / 5,
@@ -814,6 +845,74 @@ class _EmptyHint extends StatelessWidget {
             const SizedBox(width: AppTheme.spacingSm),
             TextButton(onPressed: onAction, child: Text(actionLabel!)),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Custom top header used in place of the AppBar we removed with the inner
+/// Scaffold. Plain 56-tall Container inside the outer AppShell — no Scaffold,
+/// no Hero, no PreferredSizeWidget contracts to break the parent's layout.
+class _ProfileHeader extends StatelessWidget {
+  final String titleText;
+  final List<Widget> actions;
+  final ColorScheme colors;
+  final TextTheme text;
+  const _ProfileHeader({
+    required this.titleText,
+    required this.actions,
+    required this.colors,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(bottom: BorderSide(color: colors.outlineVariant, width: 0.5)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Back',
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/browse');
+              }
+            },
+          ),
+          Expanded(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(titleText,
+                    style: text.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(width: AppTheme.spacingSm),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colors.primaryContainer,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                  ),
+                  child: Text(
+                    AppConfig.buildLabel,
+                    style: text.labelSmall?.copyWith(
+                      color: colors.onPrimaryContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...actions,
         ],
       ),
     );
