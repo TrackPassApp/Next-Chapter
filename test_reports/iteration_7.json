@@ -1,0 +1,50 @@
+{
+  "summary": "Batch D re-verification. Verified deploy stamp, mobile & desktop landing layouts, and /#/me/edit auth redirect. Found NEW BUG: /#/about/letter is not in the router's public allowlist so it redirects unauthenticated users to /#/login — the D3 three-tab founder letter is therefore NOT publicly reachable. Cannot end-to-end verify D0 (setPrimaryPhoto persistence) or D1 (Success Story ListTile horizontal layout) because sign-up requires real Supabase email verification and no test credentials exist. Source-code inspection confirms both D0 and D1 fixes are present.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AppRouter public route allowlist",
+        "issue": "/#/about/letter (and /#/about) are NOT in the isPublic set in redirect(); unauthenticated users are bounced to /#/login even though the review request says these are public routes. Final URL after visiting /#/about/letter was /#/login. D3 three-tab founder letter (Letter / My Promise / What We Believe) cannot be reached without login and could not be visually verified in the browser.",
+        "selector": "/app/nextchapter_audit/src/lib/router/app_router.dart line 47 -- `final isPublic = loc == '/' || loc == '/privacy' || loc == '/terms' || isAuthRoute;`",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_ok": [
+    "Deployed build meta x-app-build = RC1-20260702021639 (matches expected)",
+    "LandingScreen mobile 390x844: buttons 'Log In' + 'Sign Up' appear on top-right row; heart icon + 'Next Chapter' brand appears on a second row BELOW the buttons; no overlap; both buttons and brand visible (C0/B1 confirmed)",
+    "LandingScreen desktop 1440x900: single-row header shows heart+Next Chapter on left and Privacy | Terms | Log In | Sign Up on right",
+    "/#/me/edit while unauthenticated redirects to /#/login (proves route is compiled and auth-guarded)"
+  ],
+  "code_only_verification": [
+    "D0 code fix present: profile_provider.dart lines 261-289 -- setPrimaryPhoto() now awaits ProfileRepository.instance.fetchProfileById(_profileId!) after PhotoRepository.setPrimary(), assigns to _profile, and refetches _photoRecords before notifyListeners(). This should propagate to Browse card / MyProfile / ProfileDetail as claimed.",
+    "D1 code fix present: edit_profile_screen.dart lines 526-550 -- Success Story section is now `Card(margin: EdgeInsets.zero, child: ListTile(leading: Icon, title: Text('Share your Next Chapter story'), subtitle: Text(...), trailing: OutlinedButton('Share'), isThreeLine: true))`. Standard Material widget — text will render horizontally, no vertical letter-stacking possible with this structure.",
+    "D3 code present: founder_letter_screen.dart lines 17-44 -- DefaultTabController(length: 3) with TabBar(isScrollable: true) containing Tab(text: 'Letter'), Tab(text: 'My Promise'), Tab(text: 'What We Believe'). Tab labels use standard Text — no RTL/vertical rendering."
+  ],
+  "blocked_by": [
+    "Signup requires real email + Supabase email verification. /app/memory/test_credentials.md explicitly states no agent-managed credentials exist. I could not create a real user, so photo upload, 'Set as main' flow (D0), and visual inspection of the Success Story tile in the running app (D1) were not exercised.",
+    "The founder-letter public-route check was blocked by the router redirect bug reported above."
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "HIGH: In /app/nextchapter_audit/src/lib/router/app_router.dart line 47, add '/about' and '/about/letter' to the isPublic condition, e.g. `final isPublic = loc == '/' || loc == '/privacy' || loc == '/terms' || loc == '/about' || loc == '/about/letter' || isAuthRoute;`. Without this, D3 is not reachable to logged-out users and this batch's founder-letter verification cannot pass.",
+    "After the router fix, redeploy and re-run the /#/about/letter check to visually confirm the three tabs render with horizontal text.",
+    "To visually verify D0 and D1, either (a) provide a pre-verified test account in /app/memory/test_credentials.md, or (b) temporarily disable Supabase email confirmation for the preview project so sign-up can complete headlessly."
+  ],
+  "critical_code_review_comments": [
+    "Router isPublic allowlist duplicates a hard-coded string list; consider extracting a `_publicPaths` set so /about, /about/letter, /privacy, /terms, /stories/public etc. don't drift. Right now the FounderLetterScreen route is registered but silently unreachable without login — a classic 'compiled but wired-off' bug.",
+    "profile_provider.dart setPrimaryPhoto now issues two extra network calls (fetchProfileById + fetchPhotos) inside a single loading spinner — acceptable, but consider surfacing errors from those two calls distinctly (currently the outer try/catch swallows any error into a single 'Could not set primary photo.' message even if setPrimary itself succeeded).",
+    "founder_letter_screen.dart hard-codes SizedBox(height: 520) around the TabBarView — will clip on very small screens. Consider `Expanded` when embedded in a scaffold body."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "80% of testable items pass; 1 HIGH bug found; D0/D1 unverifiable due to signup blocker"},
+  "test_credentials": "None available. /app/memory/test_credentials.md confirms no agent-managed accounts. Sign-up requires real email verification via Supabase.",
+  "seed_data_creation": "None.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Build stamp on the preview at time of testing: RC1-20260702021639. The two prior fixes E1 asked to reverify (D0 photo persistence, D1 Success Story horizontal layout) are present in source but could not be exercised in a browser session because sign-up needs email verification. The /#/about/letter route bug (missing from isPublic allowlist) is the primary blocker for this batch and should be the first thing fixed and re-tested. Mobile landing header (C0/B1) looks correct in a 390x844 viewport — buttons above brand, both visible, no overlap.",
+  "rca of the issue": "app_router.dart declares the FounderLetterScreen at GoRoute(path: '/about/letter') but the redirect() logic higher in the same file only whitelists '/', '/privacy', '/terms', and the auth routes as public. Any other path visited while `authProvider.isLoggedIn == false` is redirected to '/login'. Reproduction: open https://arch-audit-dating.preview.emergentagent.com/#/about/letter in a fresh incognito session — after Flutter boots, the URL rewrites to /#/login and the Welcome Back screen renders. Fix: extend isPublic to include '/about' and '/about/letter'."
+}

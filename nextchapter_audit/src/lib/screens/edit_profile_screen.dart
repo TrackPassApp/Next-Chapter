@@ -526,42 +526,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 // ── Success Story ─────────────────────────────────────
                 _SectionHeader(title: 'Success Story', icon: Icons.stars_outlined, colors: colors, text: text),
                 const SizedBox(height: AppTheme.spacingSm),
-                Container(
-                  padding: const EdgeInsets.all(AppTheme.spacingMd),
-                  decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                    border: Border.all(color: colors.outlineVariant),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.auto_stories_outlined,
-                          color: colors.primary, size: AppTheme.iconMd),
-                      const SizedBox(width: AppTheme.spacingMd),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Share your Next Chapter story',
-                                style: text.titleSmall),
-                            Text(
-                              'Met someone through Next Chapter? Share it. '
-                              'An admin will review before it goes public.',
-                              style: text.bodySmall
-                                  ?.copyWith(color: appColors.subtleText),
-                            ),
-                          ],
-                        ),
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: ListTile(
+                    leading: Icon(Icons.auto_stories_outlined,
+                        color: colors.primary),
+                    title: const Text('Share your Next Chapter story'),
+                    subtitle: const Text(
+                      'Met someone through Next Chapter? Share it. '
+                      'An admin will review before it goes public.',
+                    ),
+                    trailing: OutlinedButton(
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (_) => const SubmitStoryDialog(),
                       ),
-                      const SizedBox(width: AppTheme.spacingSm),
-                      OutlinedButton(
-                        onPressed: () => showDialog(
-                          context: context,
-                          builder: (_) => const SubmitStoryDialog(),
-                        ),
-                        child: const Text('Share'),
-                      ),
-                    ],
+                      child: const Text('Share'),
+                    ),
+                    isThreeLine: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spacingMd, vertical: 4),
                   ),
                 ),
                 const SizedBox(height: AppTheme.spacingXxl),
@@ -1026,121 +1010,10 @@ class _PhotoTile extends StatelessWidget {
   }
 }
 
-// ─── Supabase diagnostics panel ─────────────────────────────────────────────
 
-class _SupabaseDiagnosticsPanel extends StatelessWidget {
-  final AuthProvider auth;
-  final ProfileProvider profileProvider;
-  final ColorScheme colors;
-  final TextTheme text;
-  final AppColorsExtension appColors;
-
-  const _SupabaseDiagnosticsPanel({
-    required this.auth,
-    required this.profileProvider,
-    required this.colors,
-    required this.text,
-    required this.appColors,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isConfigured = SupabaseService.isConfigured;
-    final clientAvailable = SupabaseService.client != null;
-    final isMockMode = !isConfigured || !clientAvailable;
-    final userId = auth.userId;
-    final profileLoaded = profileProvider.profile != null;
-    final configError = SupabaseService.configurationError;
-    final initError = SupabaseService.initError;
-
-    final panelColor = isMockMode
-        ? appColors.danger.withOpacity(0.08)
-        : appColors.success.withOpacity(0.08);
-    final borderColor = isMockMode
-        ? appColors.danger.withOpacity(0.35)
-        : appColors.success.withOpacity(0.35);
-
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.spacingMd),
-      decoration: BoxDecoration(
-        color: panelColor,
-        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isMockMode ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                size: AppTheme.iconSm,
-                color: isMockMode ? appColors.danger : appColors.success,
-              ),
-              const SizedBox(width: AppTheme.spacingXs),
-              Text(
-                'Supabase Connection',
-                style: text.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: isMockMode ? appColors.danger : appColors.success,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTheme.spacingSm),
-          _DiagRow(label: 'Supabase configured', value: isConfigured ? 'YES' : 'NO', ok: isConfigured, text: text, appColors: appColors),
-          _DiagRow(label: 'Mock mode active', value: isMockMode ? 'YES ⚠' : 'NO ✓', ok: !isMockMode, text: text, appColors: appColors),
-          _DiagRow(label: 'Current user ID', value: userId ?? 'NONE', ok: userId != null, text: text, appColors: appColors),
-          _DiagRow(label: 'Profile loaded from Supabase', value: profileLoaded ? 'YES' : 'NO', ok: profileLoaded, text: text, appColors: appColors),
-          _DiagRow(label: 'Last save target', value: isMockMode ? 'Mock (no persistence)' : 'Supabase', ok: !isMockMode, text: text, appColors: appColors),
-          if (configError != null) ...[
-            const SizedBox(height: AppTheme.spacingXs),
-            Text('⚠ Config error: $configError', style: text.bodySmall?.copyWith(color: appColors.danger, height: 1.5)),
-          ],
-          if (initError != null && configError == null) ...[
-            const SizedBox(height: AppTheme.spacingXs),
-            Text('⚠ Init error: $initError', style: text.bodySmall?.copyWith(color: appColors.danger, height: 1.5)),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _DiagRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool ok;
-  final TextTheme text;
-  final AppColorsExtension appColors;
-
-  const _DiagRow({required this.label, required this.value, required this.ok, required this.text, required this.appColors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Expanded(child: Text(label, style: text.bodySmall?.copyWith(color: appColors.subtleText))),
-          Text(value, style: text.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: ok ? appColors.success : appColors.danger)),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── US States list ──────────────────────────────────────────────────────────
-
-const List<String> _usStates = [
-  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado',
-  'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho',
-  'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana',
-  'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota',
-  'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
-  'New Hampshire', 'New Jersey', 'New Mexico', 'New York',
-  'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon',
-  'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
-  'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
-  'West Virginia', 'Wisconsin', 'Wyoming',
+const _usStates = <String>[
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC',
 ];
+

@@ -266,11 +266,17 @@ class ProfileProvider extends ChangeNotifier {
     try {
       await PhotoRepository.instance
           .setPrimary(profileId: _profileId!, photoId: photoId);
-      _photoRecords = await PhotoRepository.instance.fetchPhotos(_profileId!);
-      _profile = _profile?.copyWith(
-        photoUrls:
-            _photoRecords.map((r) => r['display_url'] as String).toList(),
-      );
+
+      // Re-fetch the ENTIRE profile so photoUrls (and everything else read
+      // by ProfileDetail / MyProfile / Browse card) is rebuilt from
+      // display_order-ordered rows on the server. This is the authoritative
+      // refresh — mutating photoUrls in place isn't enough because the
+      // profile row is the source of truth for Browse cards too.
+      final fresh =
+          await ProfileRepository.instance.fetchProfileById(_profileId!);
+      if (fresh != null) _profile = fresh;
+      _photoRecords =
+          await PhotoRepository.instance.fetchPhotos(_profileId!);
       _loading = false;
       notifyListeners();
       return true;

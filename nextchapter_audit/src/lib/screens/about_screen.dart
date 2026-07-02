@@ -47,18 +47,6 @@ class AboutScreen extends StatelessWidget {
                 subtitle: 'Why Next Chapter exists.',
                 onTap: () => context.push('/about/letter'),
               ),
-              _Tile(
-                icon: Icons.privacy_tip_outlined,
-                title: 'Privacy Policy',
-                subtitle: 'How we handle your data.',
-                onTap: () => context.push('/privacy'),
-              ),
-              _Tile(
-                icon: Icons.description_outlined,
-                title: 'Terms of Service',
-                subtitle: 'The community agreement.',
-                onTap: () => context.push('/terms'),
-              ),
             ],
           ),
         ),

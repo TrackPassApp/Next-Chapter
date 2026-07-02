@@ -54,6 +54,40 @@ class _AdminLogTabState extends State<AdminLogTab> {
 
     return Column(
       children: [
+        Container(
+          margin: const EdgeInsets.only(bottom: AppTheme.spacingSm),
+          padding: const EdgeInsets.all(AppTheme.spacingMd),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+            border: Border.all(color: colors.outlineVariant.withOpacity(0.35)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline, color: colors.primary, size: AppTheme.iconMd),
+              const SizedBox(width: AppTheme.spacingMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('What is the Moderation Log?',
+                        style: text.titleSmall),
+                    const SizedBox(height: 4),
+                    Text(
+                      'A read-only audit trail of every safety-relevant action taken on the platform: '
+                      'reports, verification decisions, room moderation, account suspensions and deletions, '
+                      'mutes, warnings, admin role changes, and broadcast announcements. '
+                      'Entries should generally NOT be deleted — this log is how we prove what happened, '
+                      'when, and by whom.',
+                      style: text.bodySmall?.copyWith(color: appColors.subtleText),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         Row(
           children: [
             Text('Last 200 admin actions', style: text.bodySmall?.copyWith(color: appColors.subtleText)),

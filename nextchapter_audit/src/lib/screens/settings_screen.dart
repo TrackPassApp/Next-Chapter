@@ -64,27 +64,9 @@ class SettingsScreen extends StatelessWidget {
                     onTap: () => context.push('/about'),
                   ),
                   _SettingsTile(
-                    icon: Icons.auto_stories_outlined,
-                    title: 'Letter from the Founder',
-                    onTap: () => context.push('/about/letter'),
-                  ),
-                  _SettingsTile(
                     icon: Icons.stars_outlined,
                     title: 'Success Stories',
                     onTap: () => context.push('/stories'),
-                  ),
-                ],
-                colors: colors,
-                text: text,
-              ),
-              const SizedBox(height: AppTheme.spacingMd),
-              _SettingsSection(
-                title: 'Demo & Beta Tools',
-                children: [
-                  _SettingsTile(
-                    icon: Icons.auto_awesome_outlined,
-                    title: 'Populate demo conversations',
-                    onTap: () => _seedDemoConversations(context, appColors),
                   ),
                 ],
                 colors: colors,
