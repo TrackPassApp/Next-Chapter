@@ -72,6 +72,7 @@ class _AdminMetricsTabState extends State<AdminMetricsTab> {
 
     final width = MediaQuery.sizeOf(context).width;
     final cols = width < 700 ? 2 : (width < 1100 ? 3 : 4);
+    final aspect = width < 400 ? 1.05 : (width < 700 ? 1.25 : 1.6);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -93,7 +94,7 @@ class _AdminMetricsTabState extends State<AdminMetricsTab> {
               crossAxisCount: cols,
               mainAxisSpacing: AppTheme.spacingMd,
               crossAxisSpacing: AppTheme.spacingMd,
-              childAspectRatio: 1.6,
+              childAspectRatio: aspect,
             ),
             itemCount: cards.length,
             itemBuilder: (_, i) => _MetricCard(spec: cards[i]),
@@ -152,11 +153,20 @@ class _MetricCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.max,
         children: [
           Icon(spec.icon, color: spec.color, size: AppTheme.iconMd),
           const Spacer(),
-          Text('${spec.value}', style: text.headlineSmall?.copyWith(color: spec.color)),
-          Text(spec.label, style: text.labelMedium),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text('${spec.value}',
+                style: text.headlineSmall?.copyWith(color: spec.color)),
+          ),
+          Text(spec.label,
+              style: text.labelMedium,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis),
         ],
       ),
     );

@@ -69,15 +69,23 @@ class AdminScreen extends StatelessWidget {
     ];
 
     final roleLabel = (auth.role ?? 'unknown').toUpperCase();
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
 
     return DefaultTabController(
       length: tabs.length,
       child: Scaffold(
         appBar: AppBar(
+          titleSpacing: isMobile ? 8 : NavigationToolbar.kMiddleSpacing,
           title: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Admin Dashboard'),
-              const SizedBox(width: AppTheme.spacingMd),
+              Flexible(
+                child: Text(
+                  isMobile ? 'Admin' : 'Admin Dashboard',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              SizedBox(width: isMobile ? AppTheme.spacingSm : AppTheme.spacingMd),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingSm, vertical: 2),
                 decoration: BoxDecoration(
@@ -97,12 +105,19 @@ class AdminScreen extends StatelessWidget {
             ],
           ),
           actions: [
-            TextButton.icon(
-              onPressed: () => context.go('/browse'),
-              icon: const Icon(Icons.exit_to_app, size: 18),
-              label: const Text('Exit admin'),
-            ),
-            const SizedBox(width: AppTheme.spacingMd),
+            if (isMobile)
+              IconButton(
+                tooltip: 'Exit admin',
+                onPressed: () => context.go('/browse'),
+                icon: const Icon(Icons.exit_to_app),
+              )
+            else
+              TextButton.icon(
+                onPressed: () => context.go('/browse'),
+                icon: const Icon(Icons.exit_to_app, size: 18),
+                label: const Text('Exit admin'),
+              ),
+            SizedBox(width: isMobile ? 4 : AppTheme.spacingMd),
           ],
           bottom: TabBar(
             isScrollable: true,

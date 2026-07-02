@@ -25,12 +25,20 @@ class _ProfileCompletionCardState extends State<ProfileCompletionCard> {
   }
 
   Future<void> _load() async {
-    final myId = context.read<ProfileProvider>().profileId;
+    final profile = context.read<ProfileProvider>().profile;
+    final myId = profile?.id;
     final db = SupabaseService.client;
     if (myId == null || db == null) return;
     try {
-      final s = await db.rpc('profile_completion',
-          params: {'target_profile_id': myId});
+      // Single source of truth: the score stored on profiles.completeness_score
+      // (server trigger-maintained). This matches what Edit Profile shows.
+      final row = await db
+          .from('profiles')
+          .select('completeness_score')
+          .eq('id', myId)
+          .maybeSingle();
+      final s = (row?['completeness_score'] as int?) ?? profile?.completenessScore ?? 0;
+
       final photos = await db
           .from('profile_photos')
           .select('id')
@@ -48,8 +56,6 @@ class _ProfileCompletionCardState extends State<ProfileCompletionCard> {
           .select()
           .eq('profile_id', myId)
           .maybeSingle();
-      final profile =
-          context.read<ProfileProvider>().profile;
 
       final suggestions = <_Suggestion>[];
       if ((photos as List).length < 3) {
@@ -79,7 +85,7 @@ class _ProfileCompletionCardState extends State<ProfileCompletionCard> {
 
       if (mounted) {
         setState(() {
-          _score = (s as int?) ?? 0;
+          _score = s;
           _suggestions = suggestions.take(4).toList();
         });
       }
@@ -92,11 +98,14 @@ class _ProfileCompletionCardState extends State<ProfileCompletionCard> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final text = theme.textTheme;
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
 
     return Container(
       margin: const EdgeInsets.symmetric(
           horizontal: AppTheme.spacingMd, vertical: AppTheme.spacingSm),
-      padding: const EdgeInsets.all(AppTheme.spacingMd),
+      padding: EdgeInsets.symmetric(
+          horizontal: AppTheme.spacingMd,
+          vertical: isMobile ? AppTheme.spacingSm : AppTheme.spacingMd),
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
@@ -104,6 +113,7 @@ class _ProfileCompletionCardState extends State<ProfileCompletionCard> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
@@ -113,11 +123,16 @@ class _ProfileCompletionCardState extends State<ProfileCompletionCard> {
               ),
               TextButton(
                 onPressed: () => context.go('/me/edit'),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  visualDensity: VisualDensity.compact,
+                ),
                 child: const Text('Improve'),
               ),
             ],
           ),
-          const SizedBox(height: AppTheme.spacingSm),
+          const SizedBox(height: 6),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
@@ -127,25 +142,37 @@ class _ProfileCompletionCardState extends State<ProfileCompletionCard> {
               color: colors.primary,
             ),
           ),
+          // On mobile keep the card tight — one line of suggestion text.
+          // On wider screens show the full chip wrap so power users see all.
           if (_suggestions.isNotEmpty) ...[
-            const SizedBox(height: AppTheme.spacingSm),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                for (final s in _suggestions)
-                  ActionChip(
-                    avatar: Icon(s.icon, size: 14, color: colors.primary),
-                    label: Text(s.label,
-                        style: text.labelSmall
-                            ?.copyWith(color: colors.primary)),
-                    onPressed: () => context.go(s.route),
-                    backgroundColor: colors.primaryContainer.withOpacity(0.5),
-                    side: BorderSide.none,
-                    visualDensity: VisualDensity.compact,
-                  ),
-              ],
-            ),
+            const SizedBox(height: 6),
+            if (isMobile)
+              Text(
+                'Next: ${_suggestions.first.label.toLowerCase()}',
+                style: text.labelSmall
+                    ?.copyWith(color: colors.primary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )
+            else
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final s in _suggestions)
+                    ActionChip(
+                      avatar: Icon(s.icon, size: 14, color: colors.primary),
+                      label: Text(s.label,
+                          style: text.labelSmall
+                              ?.copyWith(color: colors.primary)),
+                      onPressed: () => context.go(s.route),
+                      backgroundColor:
+                          colors.primaryContainer.withOpacity(0.5),
+                      side: BorderSide.none,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                ],
+              ),
           ],
         ],
       ),

@@ -93,6 +93,23 @@ class _AdminVerificationTabState extends State<AdminVerificationTab> {
                   final name = profile['first_name'] as String? ?? '—';
                   final city = profile['city'] as String? ?? '';
                   final state = profile['state'] as String? ?? '';
+                  final isMobile = MediaQuery.sizeOf(context).width < 700;
+                  final badges = Wrap(
+                    spacing: AppTheme.spacingXs,
+                    runSpacing: 4,
+                    children: [
+                      _VBadge(label: 'Email',  verified: row['email_verified']  == true, appColors: appColors),
+                      _VBadge(label: 'Phone',  verified: row['phone_verified']  == true, appColors: appColors),
+                      _VBadge(label: 'Selfie', verified: row['selfie_verified'] == true, appColors: appColors),
+                      _VBadge(label: 'ID',     verified: row['id_verified']     == true, appColors: appColors),
+                    ],
+                  );
+                  final reviewBtn = OutlinedButton(
+                    onPressed: profileId.isEmpty
+                        ? null
+                        : () => openAdminUserDialog(context, profileId).then((_) => _load()),
+                    child: const Text('Review'),
+                  );
                   return Container(
                     padding: const EdgeInsets.all(AppTheme.spacingMd),
                     decoration: BoxDecoration(
@@ -100,41 +117,72 @@ class _AdminVerificationTabState extends State<AdminVerificationTab> {
                       borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
                       border: Border.all(color: colors.outlineVariant),
                     ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: colors.primaryContainer,
-                          child: Text(name.isNotEmpty ? name[0] : '?',
-                              style: text.titleSmall?.copyWith(color: colors.primary)),
-                        ),
-                        const SizedBox(width: AppTheme.spacingMd),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    child: isMobile
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text(name, style: text.titleSmall),
-                              Text('${city.isEmpty ? "" : "$city, "}$state', style: text.bodySmall),
+                              Row(children: [
+                                CircleAvatar(
+                                  backgroundColor: colors.primaryContainer,
+                                  child: Text(name.isNotEmpty ? name[0] : '?',
+                                      style: text.titleSmall
+                                          ?.copyWith(color: colors.primary)),
+                                ),
+                                const SizedBox(width: AppTheme.spacingMd),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(name,
+                                          style: text.titleSmall,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis),
+                                      Text(
+                                        '${city.isEmpty ? "" : "$city, "}$state',
+                                        style: text.bodySmall,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                reviewBtn,
+                              ]),
+                              const SizedBox(height: AppTheme.spacingSm),
+                              badges,
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: colors.primaryContainer,
+                                child: Text(name.isNotEmpty ? name[0] : '?',
+                                    style: text.titleSmall
+                                        ?.copyWith(color: colors.primary)),
+                              ),
+                              const SizedBox(width: AppTheme.spacingMd),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(name,
+                                        style: text.titleSmall,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis),
+                                    Text(
+                                      '${city.isEmpty ? "" : "$city, "}$state',
+                                      style: text.bodySmall,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              badges,
+                              const SizedBox(width: AppTheme.spacingSm),
+                              reviewBtn,
                             ],
                           ),
-                        ),
-                        Wrap(
-                          spacing: AppTheme.spacingXs,
-                          children: [
-                            _VBadge(label: 'Email', verified: row['email_verified'] == true, appColors: appColors),
-                            _VBadge(label: 'Phone', verified: row['phone_verified'] == true, appColors: appColors),
-                            _VBadge(label: 'Selfie', verified: row['selfie_verified'] == true, appColors: appColors),
-                            _VBadge(label: 'ID', verified: row['id_verified'] == true, appColors: appColors),
-                          ],
-                        ),
-                        const SizedBox(width: AppTheme.spacingSm),
-                        OutlinedButton(
-                          onPressed: profileId.isEmpty
-                              ? null
-                              : () => openAdminUserDialog(context, profileId).then((_) => _load()),
-                          child: const Text('Review'),
-                        ),
-                      ],
-                    ),
                   );
                 },
               ),

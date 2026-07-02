@@ -24,6 +24,7 @@ class LandingScreen extends StatelessWidget {
             backgroundColor: colors.surface,
             surfaceTintColor: Colors.transparent,
             title: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
                   padding: const EdgeInsets.all(AppTheme.spacingSm),
@@ -33,8 +34,10 @@ class LandingScreen extends StatelessWidget {
                   ),
                   child: Icon(Icons.favorite, size: AppTheme.iconMd, color: colors.primary),
                 ),
-                const SizedBox(width: AppTheme.spacingSm),
-                Text('Next Chapter', style: text.titleLarge?.copyWith(color: colors.primary)),
+                if (!isMobile) ...[
+                  const SizedBox(width: AppTheme.spacingSm),
+                  Text('Next Chapter', style: text.titleLarge?.copyWith(color: colors.primary)),
+                ],
               ],
             ),
             actions: [
@@ -45,16 +48,22 @@ class LandingScreen extends StatelessWidget {
               ],
               OutlinedButton(
                 onPressed: () => context.go('/login'),
-                style: OutlinedButton.styleFrom(minimumSize: const Size(80, 40)),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: Size(isMobile ? 64 : 80, 40),
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 16),
+                ),
                 child: const Text('Log In'),
               ),
-              const SizedBox(width: AppTheme.spacingSm),
+              SizedBox(width: isMobile ? 6 : AppTheme.spacingSm),
               ElevatedButton(
                 onPressed: () => context.go('/signup'),
-                style: ElevatedButton.styleFrom(minimumSize: const Size(80, 40)),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: Size(isMobile ? 64 : 80, 40),
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 16),
+                ),
                 child: const Text('Sign Up'),
               ),
-              const SizedBox(width: AppTheme.spacingMd),
+              SizedBox(width: isMobile ? AppTheme.spacingSm : AppTheme.spacingMd),
             ],
           ),
           const SliverToBoxAdapter(child: HeroSection()),

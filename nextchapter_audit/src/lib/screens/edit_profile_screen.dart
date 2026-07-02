@@ -709,11 +709,38 @@ class _PromptEditor extends StatelessWidget {
           DropdownButtonFormField<String>(
             value: draft.key,
             isExpanded: true,
+            itemHeight: 72,
+            menuMaxHeight: 380,
             decoration: const InputDecoration(labelText: 'Choose a prompt'),
+            selectedItemBuilder: (context) {
+              final all = <String>[
+                if (draft.key != null && !available.contains(draft.key)) draft.key!,
+                ...available,
+              ];
+              return all
+                  .map((p) => Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(p,
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ))
+                  .toList();
+            },
             items: [
               if (draft.key != null && !available.contains(draft.key))
-                DropdownMenuItem(value: draft.key, child: Text(draft.key!, overflow: TextOverflow.ellipsis)),
-              ...available.map((p) => DropdownMenuItem(value: p, child: Text(p, overflow: TextOverflow.ellipsis))),
+                DropdownMenuItem(
+                  value: draft.key,
+                  child: Text(draft.key!,
+                      softWrap: true,
+                      maxLines: 3,
+                      style: const TextStyle(height: 1.2)),
+                ),
+              ...available.map((p) => DropdownMenuItem(
+                    value: p,
+                    child: Text(p,
+                        softWrap: true,
+                        maxLines: 3,
+                        style: const TextStyle(height: 1.2)),
+                  )),
             ],
             onChanged: (v) {
               draft.key = v;
