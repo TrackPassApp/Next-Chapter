@@ -255,4 +255,31 @@ class ProfileProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  /// Promote the given photo to primary. Refreshes the local cache so the
+  /// browse card + profile detail immediately reflect the new main photo.
+  Future<bool> setPrimaryPhoto(String photoId) async {
+    if (SupabaseService.client == null) return false;
+    if (_profileId == null) return false;
+    _loading = true;
+    notifyListeners();
+    try {
+      await PhotoRepository.instance
+          .setPrimary(profileId: _profileId!, photoId: photoId);
+      _photoRecords = await PhotoRepository.instance.fetchPhotos(_profileId!);
+      _profile = _profile?.copyWith(
+        photoUrls:
+            _photoRecords.map((r) => r['display_url'] as String).toList(),
+      );
+      _loading = false;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      _error = 'Could not set primary photo.';
+      _loading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
 }

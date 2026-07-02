@@ -10,6 +10,7 @@ import '../providers/profile_provider.dart';
 import '../services/supabase_service.dart';
 import '../theme/theme.dart';
 import '../widgets/common/completeness_ring.dart';
+import '../widgets/profile/submit_story_dialog.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -259,6 +260,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     await context.read<ProfileProvider>().deletePhoto(photoId);
   }
 
+  Future<void> _setPrimaryPhoto(String photoId) async {
+    final ok = await context.read<ProfileProvider>().setPrimaryPhoto(photoId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok ? 'Main photo updated.' : 'Could not update main photo.'),
+    ));
+  }
+
+
   // ─── Build ───────────────────────────────────────────────────────────────
 
   @override
@@ -269,7 +279,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final appColors = theme.extension<AppColorsExtension>()!;
     final profileProvider = context.watch<ProfileProvider>();
     final photoCount = profileProvider.photoRecords.length;
-    final completeness = _liveCompleteness(photoCount);
+    // Single source of truth for the completion percentage: the value stored
+    // on profiles.completeness_score (trigger-maintained on the server).
+    // My Profile card + Profile Detail read the same field.
+    final completeness = profileProvider.profile?.completenessScore
+        ?? _liveCompleteness(photoCount);
 
     return Scaffold(
       appBar: AppBar(
@@ -296,15 +310,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             child: ListView(
               padding: const EdgeInsets.all(AppTheme.spacingMd),
               children: [
-                _SupabaseDiagnosticsPanel(
-                  auth: context.watch<AuthProvider>(),
-                  profileProvider: profileProvider,
-                  colors: colors,
-                  text: text,
-                  appColors: appColors,
-                ),
-                const SizedBox(height: AppTheme.spacingMd),
-
                 _CompletenessHeader(score: completeness, colors: colors, text: text),
                 const SizedBox(height: AppTheme.spacingMd),
 
@@ -329,6 +334,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   uploading: _uploadingPhoto,
                   onUpload: _pickAndUploadPhoto,
                   onDelete: _deletePhoto,
+                  onSetPrimary: _setPrimaryPhoto,
                   colors: colors,
                   appColors: appColors,
                 ),
@@ -514,6 +520,49 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         : _selectedLifeSituation.add(v);
                   }),
                   colors: colors,
+                ),
+                const SizedBox(height: AppTheme.spacingLg),
+
+                // ── Success Story ─────────────────────────────────────
+                _SectionHeader(title: 'Success Story', icon: Icons.stars_outlined, colors: colors, text: text),
+                const SizedBox(height: AppTheme.spacingSm),
+                Container(
+                  padding: const EdgeInsets.all(AppTheme.spacingMd),
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                    border: Border.all(color: colors.outlineVariant),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.auto_stories_outlined,
+                          color: colors.primary, size: AppTheme.iconMd),
+                      const SizedBox(width: AppTheme.spacingMd),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Share your Next Chapter story',
+                                style: text.titleSmall),
+                            Text(
+                              'Met someone through Next Chapter? Share it. '
+                              'An admin will review before it goes public.',
+                              style: text.bodySmall
+                                  ?.copyWith(color: appColors.subtleText),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppTheme.spacingSm),
+                      OutlinedButton(
+                        onPressed: () => showDialog(
+                          context: context,
+                          builder: (_) => const SubmitStoryDialog(),
+                        ),
+                        child: const Text('Share'),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: AppTheme.spacingXxl),
 
@@ -824,6 +873,7 @@ class _PhotoGrid extends StatelessWidget {
   final bool uploading;
   final VoidCallback onUpload;
   final ValueChanged<String> onDelete;
+  final ValueChanged<String> onSetPrimary;
   final ColorScheme colors;
   final AppColorsExtension appColors;
 
@@ -832,6 +882,7 @@ class _PhotoGrid extends StatelessWidget {
     required this.uploading,
     required this.onUpload,
     required this.onDelete,
+    required this.onSetPrimary,
     required this.colors,
     required this.appColors,
   });
@@ -842,12 +893,16 @@ class _PhotoGrid extends StatelessWidget {
       spacing: AppTheme.spacingSm,
       runSpacing: AppTheme.spacingSm,
       children: [
-        ...photoRecords.map((record) {
+        ...photoRecords.asMap().entries.map((entry) {
+          final index = entry.key;
+          final record = entry.value;
           final photoId = record['id'] as String;
           final url = record['display_url'] as String;
           return _PhotoTile(
             url: url,
+            isPrimary: index == 0,
             onDelete: () => onDelete(photoId),
+            onSetPrimary: index == 0 ? null : () => onSetPrimary(photoId),
             colors: colors,
             appColors: appColors,
           );
@@ -881,11 +936,20 @@ class _PhotoGrid extends StatelessWidget {
 
 class _PhotoTile extends StatelessWidget {
   final String url;
+  final bool isPrimary;
   final VoidCallback onDelete;
+  final VoidCallback? onSetPrimary;
   final ColorScheme colors;
   final AppColorsExtension appColors;
 
-  const _PhotoTile({required this.url, required this.onDelete, required this.colors, required this.appColors});
+  const _PhotoTile({
+    required this.url,
+    required this.isPrimary,
+    required this.onDelete,
+    required this.onSetPrimary,
+    required this.colors,
+    required this.appColors,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -906,6 +970,42 @@ class _PhotoTile extends StatelessWidget {
             ),
           ),
         ),
+        if (isPrimary)
+          Positioned(
+            left: 4,
+            bottom: 4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: colors.primary,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Text('MAIN',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  )),
+            ),
+          ),
+        if (!isPrimary && onSetPrimary != null)
+          Positioned(
+            left: 4,
+            bottom: 4,
+            child: GestureDetector(
+              onTap: onSetPrimary,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text('Set as main',
+                    style: TextStyle(color: Colors.white, fontSize: 10)),
+              ),
+            ),
+          ),
         Positioned(
           top: 4,
           right: 4,

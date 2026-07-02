@@ -109,4 +109,40 @@ class PhotoRepository {
 
     return List<Map<String, dynamic>>.from(rows as List);
   }
+
+  /// Promote the given photo to the primary slot (display_order = 0).
+  /// Other photos are re-numbered 1..N preserving their prior order.
+  Future<void> setPrimary({
+    required String profileId,
+    required String photoId,
+  }) async {
+    final db = SupabaseService.client;
+    if (db == null) return;
+
+    final rows = await db
+        .from('profile_photos')
+        .select('id, display_order')
+        .eq('profile_id', profileId)
+        .order('display_order');
+
+    final list = List<Map<String, dynamic>>.from(rows as List);
+    if (list.isEmpty) return;
+
+    // Reorder so the chosen id is first.
+    list.sort((a, b) {
+      if (a['id'] == photoId) return -1;
+      if (b['id'] == photoId) return 1;
+      final ao = (a['display_order'] as int?) ?? 0;
+      final bo = (b['display_order'] as int?) ?? 0;
+      return ao.compareTo(bo);
+    });
+
+    // Apply the new display_order values.
+    for (var i = 0; i < list.length; i++) {
+      await db
+          .from('profile_photos')
+          .update({'display_order': i})
+          .eq('id', list[i]['id'] as String);
+    }
+  }
 }

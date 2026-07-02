@@ -23,48 +23,107 @@ class LandingScreen extends StatelessWidget {
             floating: true,
             backgroundColor: colors.surface,
             surfaceTintColor: Colors.transparent,
-            title: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppTheme.spacingSm),
-                  decoration: BoxDecoration(
-                    color: colors.primaryContainer,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+            toolbarHeight: isMobile ? 108 : kToolbarHeight,
+            automaticallyImplyLeading: false,
+            titleSpacing: 0,
+            title: isMobile
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spacingMd),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: AppTheme.spacingSm),
+                        // 1) Buttons ABOVE the brand on mobile.
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton(
+                              onPressed: () => context.go('/login'),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(72, 36),
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                              ),
+                              child: const Text('Log In'),
+                            ),
+                            const SizedBox(width: AppTheme.spacingSm),
+                            ElevatedButton(
+                              onPressed: () => context.go('/signup'),
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size(72, 36),
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                              ),
+                              child: const Text('Sign Up'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppTheme.spacingSm),
+                        // 2) Brand row BELOW the buttons. Words visible.
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(AppTheme.spacingSm),
+                              decoration: BoxDecoration(
+                                color: colors.primaryContainer,
+                                borderRadius:
+                                    BorderRadius.circular(AppTheme.radiusSmall),
+                              ),
+                              child: Icon(Icons.favorite,
+                                  size: AppTheme.iconMd, color: colors.primary),
+                            ),
+                            const SizedBox(width: AppTheme.spacingSm),
+                            Flexible(
+                              child: Text('Next Chapter',
+                                  style: text.titleLarge
+                                      ?.copyWith(color: colors.primary),
+                                  overflow: TextOverflow.ellipsis),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: AppTheme.spacingMd),
+                      Container(
+                        padding: const EdgeInsets.all(AppTheme.spacingSm),
+                        decoration: BoxDecoration(
+                          color: colors.primaryContainer,
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.radiusSmall),
+                        ),
+                        child: Icon(Icons.favorite,
+                            size: AppTheme.iconMd, color: colors.primary),
+                      ),
+                      const SizedBox(width: AppTheme.spacingSm),
+                      Text('Next Chapter',
+                          style: text.titleLarge
+                              ?.copyWith(color: colors.primary)),
+                    ],
                   ),
-                  child: Icon(Icons.favorite, size: AppTheme.iconMd, color: colors.primary),
-                ),
-                if (!isMobile) ...[
-                  const SizedBox(width: AppTheme.spacingSm),
-                  Text('Next Chapter', style: text.titleLarge?.copyWith(color: colors.primary)),
-                ],
-              ],
-            ),
-            actions: [
-              if (!isMobile) ...[
-                TextButton(onPressed: () => context.go('/privacy'), child: const Text('Privacy')),
-                TextButton(onPressed: () => context.go('/terms'), child: const Text('Terms')),
-                const SizedBox(width: AppTheme.spacingSm),
-              ],
-              OutlinedButton(
-                onPressed: () => context.go('/login'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: Size(isMobile ? 64 : 80, 40),
-                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 16),
-                ),
-                child: const Text('Log In'),
-              ),
-              SizedBox(width: isMobile ? 6 : AppTheme.spacingSm),
-              ElevatedButton(
-                onPressed: () => context.go('/signup'),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: Size(isMobile ? 64 : 80, 40),
-                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 16),
-                ),
-                child: const Text('Sign Up'),
-              ),
-              SizedBox(width: isMobile ? AppTheme.spacingSm : AppTheme.spacingMd),
-            ],
+            actions: isMobile
+                ? const []
+                : [
+                    TextButton(onPressed: () => context.go('/privacy'), child: const Text('Privacy')),
+                    TextButton(onPressed: () => context.go('/terms'), child: const Text('Terms')),
+                    const SizedBox(width: AppTheme.spacingSm),
+                    OutlinedButton(
+                      onPressed: () => context.go('/login'),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size(80, 40)),
+                      child: const Text('Log In'),
+                    ),
+                    const SizedBox(width: AppTheme.spacingSm),
+                    ElevatedButton(
+                      onPressed: () => context.go('/signup'),
+                      style: ElevatedButton.styleFrom(minimumSize: const Size(80, 40)),
+                      child: const Text('Sign Up'),
+                    ),
+                    const SizedBox(width: AppTheme.spacingMd),
+                  ],
           ),
           const SliverToBoxAdapter(child: HeroSection()),
           const SliverToBoxAdapter(child: FeaturesSection()),
