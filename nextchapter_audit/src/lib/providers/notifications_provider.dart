@@ -146,6 +146,48 @@ class NotificationsProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> deleteOne(String id) async {
+    final db = SupabaseService.client;
+    if (db == null) return;
+    try {
+      await db.from('notifications').delete().eq('id', id);
+      _items.removeWhere((n) => n.id == id);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> deleteAll() async {
+    final db = SupabaseService.client;
+    if (db == null || _userId == null) return;
+    try {
+      await db.from('notifications').delete().eq('user_id', _userId!);
+      _items.clear();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> markOneRead(String id) async {
+    final db = SupabaseService.client;
+    if (db == null) return;
+    try {
+      await db.rpc('mark_notifications_read', params: {'ids': [id]});
+      final i = _items.indexWhere((n) => n.id == id);
+      if (i >= 0 && _items[i].isUnread) {
+        _items[i] = AppNotification(
+          id: _items[i].id,
+          kind: _items[i].kind,
+          title: _items[i].title,
+          body: _items[i].body,
+          link: _items[i].link,
+          payload: _items[i].payload,
+          readAt: DateTime.now(),
+          createdAt: _items[i].createdAt,
+        );
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _stopStream();

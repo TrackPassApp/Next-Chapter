@@ -55,9 +55,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             onPressed: () => context.push('/notifications/settings'),
             icon: const Icon(Icons.tune),
           ),
-          TextButton(
-            onPressed: provider.unreadCount == 0 ? null : provider.markAllRead,
-            child: const Text('Mark all read'),
+          PopupMenuButton<String>(
+            onSelected: (v) async {
+              if (v == 'read') provider.markAllRead();
+              if (v == 'clear') {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Delete all notifications?'),
+                    content: const Text('This cannot be undone.'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                      FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete all')),
+                    ],
+                  ),
+                );
+                if (ok == true) await provider.deleteAll();
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'read', child: Text('Mark all read')),
+              PopupMenuItem(value: 'clear', child: Text('Delete all')),
+            ],
           ),
         ],
       ),
@@ -89,46 +108,74 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
                 itemBuilder: (_, i) {
                   final n = provider.items[i];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: n.isUnread
-                          ? colors.primaryContainer
-                          : colors.surface,
-                      child: Icon(_iconFor(n.kind), color: colors.primary),
+                  return Dismissible(
+                    key: ValueKey(n.id),
+                    background: Container(
+                      color: appColors.danger.withOpacity(0.9),
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: const Icon(Icons.delete_outline, color: Colors.white),
                     ),
-                    title: Text(n.title,
-                        style: text.titleSmall?.copyWith(
-                          fontWeight:
-                              n.isUnread ? FontWeight.w700 : FontWeight.w400,
-                        )),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (n.body != null && n.body!.isNotEmpty)
-                          Text(n.body!,
-                              maxLines: 2, overflow: TextOverflow.ellipsis),
-                        Text(
-                          DateFormat.MMMd().add_jm().format(n.createdAt.toLocal()),
-                          style: text.labelSmall
-                              ?.copyWith(color: appColors.subtleText),
-                        ),
-                      ],
-                    ),
-                    trailing: n.isUnread
-                        ? Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: colors.primary,
-                              shape: BoxShape.circle,
+                    direction: DismissDirection.endToStart,
+                    onDismissed: (_) => provider.deleteOne(n.id),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: n.isUnread
+                            ? colors.primaryContainer
+                            : colors.surface,
+                        child: Icon(_iconFor(n.kind), color: colors.primary),
+                      ),
+                      title: Text(n.title,
+                          style: text.titleSmall?.copyWith(
+                            fontWeight:
+                                n.isUnread ? FontWeight.w700 : FontWeight.w400,
+                          )),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (n.body != null && n.body!.isNotEmpty)
+                            Text(n.body!,
+                                maxLines: 2, overflow: TextOverflow.ellipsis),
+                          Text(
+                            DateFormat.MMMd()
+                                .add_jm()
+                                .format(n.createdAt.toLocal()),
+                            style: text.labelSmall
+                                ?.copyWith(color: appColors.subtleText),
+                          ),
+                        ],
+                      ),
+                      trailing: IconButton(
+                        tooltip: 'Delete',
+                        icon: Icon(Icons.close,
+                            size: 18, color: appColors.subtleText),
+                        onPressed: () => provider.deleteOne(n.id),
+                      ),
+                      onTap: () async {
+                        await provider.markOneRead(n.id);
+                        if (!context.mounted) return;
+                        if (n.link != null && n.link!.isNotEmpty) {
+                          context.push(n.link!);
+                        } else {
+                          // No target — show the full body so nothing feels broken.
+                          showDialog(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: Text(n.title),
+                              content: SingleChildScrollView(
+                                child: Text(n.body ?? ''),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Close'),
+                                ),
+                              ],
                             ),
-                          )
-                        : null,
-                    onTap: () {
-                      if (n.link != null && n.link!.isNotEmpty) {
-                        context.push(n.link!);
-                      }
-                    },
+                          );
+                        }
+                      },
+                    ),
                   );
                 },
               ),

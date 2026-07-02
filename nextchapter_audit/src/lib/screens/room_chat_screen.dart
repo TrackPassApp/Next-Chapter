@@ -49,6 +49,10 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final provider = context.read<CommunityProvider>();
+      // Ensure the community provider has a profile id even if the user
+      // opened /community/:slug before ProfileProvider fired.
+      final myId = context.read<ProfileProvider>().profileId;
+      if (myId != null) provider.bindProfile(myId);
       if (provider.rooms.isEmpty) await provider.loadRooms();
       _room = provider.rooms.firstWhere(
         (r) => r.slug == widget.slug,
