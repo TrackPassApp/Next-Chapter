@@ -138,11 +138,24 @@ class PhotoRepository {
     });
 
     // Apply the new display_order values.
+    //
+    // We attach `.select('id')` so PostgREST returns the affected rows. If
+    // RLS silently rejects the update (0 rows affected) the operation would
+    // otherwise appear to succeed while leaving the DB unchanged — which is
+    // the exact failure mode we're guarding against here. Any empty result
+    // is escalated so the caller can surface it.
     for (var i = 0; i < list.length; i++) {
-      await db
+      final rows = await db
           .from('profile_photos')
           .update({'display_order': i})
-          .eq('id', list[i]['id'] as String);
+          .eq('id', list[i]['id'] as String)
+          .select('id');
+      if ((rows as List).isEmpty) {
+        throw StateError(
+          'setPrimary: display_order update affected 0 rows for photo '
+          '${list[i]['id']} (profile $profileId). Likely an RLS/match issue.',
+        );
+      }
     }
   }
 }
