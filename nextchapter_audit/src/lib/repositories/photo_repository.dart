@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import '../services/supabase_service.dart';
 
@@ -59,7 +60,14 @@ class PhotoRepository {
 
   // ─── Delete ───────────────────────────────────────────────────────────────
 
-  /// Delete a single photo from Storage and its database row.
+  /// Delete a single photo:
+  ///   1. Delete the DB row first and verify with `.select('id')` — a
+  ///      returned empty list surfaces an RLS/match failure loudly rather
+  ///      than pretending success.
+  ///   2. Storage removal is best-effort: run in a separate try/catch that
+  ///      only logs. The DB row is the source of truth for the app UI — if
+  ///      the object lingers in the bucket it becomes an orphan the app
+  ///      never references, which is safe to sweep asynchronously later.
   Future<void> deletePhoto({
     required String photoId,
     required String storagePath,
@@ -67,10 +75,27 @@ class PhotoRepository {
     final db = SupabaseService.client;
     if (db == null) return;
 
-    await Future.wait<void>([
-      db.storage.from(_bucket).remove([storagePath]).then((_) {}),
-      db.from('profile_photos').delete().eq('id', photoId).then((_) {}),
-    ]);
+    // 1. Authoritative delete: DB row, verify affected rows.
+    final deleted = await db
+        .from('profile_photos')
+        .delete()
+        .eq('id', photoId)
+        .select('id');
+    if ((deleted as List).isEmpty) {
+      throw StateError(
+        'deletePhoto: profile_photos delete affected 0 rows for photo '
+        '$photoId. Likely an RLS/match issue.',
+      );
+    }
+
+    // 2. Best-effort storage cleanup.
+    try {
+      await db.storage.from(_bucket).remove([storagePath]);
+    } catch (e) {
+      debugPrint(
+        'deletePhoto: storage remove failed for $storagePath: $e',
+      );
+    }
   }
 
   /// Delete all photos for a profile. Used during account deletion.
