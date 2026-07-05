@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../data/prompts_catalog.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
+import '../providers/browse_provider.dart';
 import '../providers/profile_provider.dart';
 import '../services/supabase_service.dart';
 import '../theme/theme.dart';
@@ -261,11 +262,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _setPrimaryPhoto(String photoId) async {
-    final ok = await context.read<ProfileProvider>().setPrimaryPhoto(photoId);
+    final profileProvider = context.read<ProfileProvider>();
+    final ok = await profileProvider.setPrimaryPhoto(photoId);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(ok ? 'Main photo updated.' : 'Could not update main photo.'),
+      content: Text(ok
+          ? 'Main photo updated.'
+          : (profileProvider.error ?? 'Could not update main photo.')),
     ));
+    // Force the browse feed to re-fetch so the new main photo shows on
+    // profile cards elsewhere in the app.
+    if (!mounted) return;
+    await context.read<BrowseProvider>().loadProfiles();
   }
 
 

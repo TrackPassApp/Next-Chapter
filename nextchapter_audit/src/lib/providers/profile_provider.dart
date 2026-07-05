@@ -280,8 +280,11 @@ class ProfileProvider extends ChangeNotifier {
       _loading = false;
       notifyListeners();
       return true;
-    } catch (_) {
-      _error = 'Could not set primary photo.';
+    } catch (e, st) {
+      // Surface the actual error to the UI so silent failures stop looking
+      // like success. The debugPrint captures the stack trace in devtools.
+      debugPrint('setPrimaryPhoto failed: $e\n$st');
+      _error = 'Could not set primary photo: $e';
       _loading = false;
       notifyListeners();
       return false;

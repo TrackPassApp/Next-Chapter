@@ -162,6 +162,11 @@ class PhotoRepository {
       return ao.compareTo(bo);
     });
 
+    debugPrint(
+      'setPrimary: post-sort order for profile $profileId (target=$photoId): '
+      '${list.map((r) => r['id']).toList()}',
+    );
+
     // Apply the new display_order values.
     //
     // We attach `.select('id')` so PostgREST returns the affected rows. If
@@ -175,7 +180,12 @@ class PhotoRepository {
           .update({'display_order': i})
           .eq('id', list[i]['id'] as String)
           .select('id');
-      if ((rows as List).isEmpty) {
+      final rowsList = (rows as List);
+      debugPrint(
+        'setPrimary: photo ${list[i]['id']} -> display_order=$i, '
+        'affected ${rowsList.length} row(s)',
+      );
+      if (rowsList.isEmpty) {
         throw StateError(
           'setPrimary: display_order update affected 0 rows for photo '
           '${list[i]['id']} (profile $profileId). Likely an RLS/match issue.',
