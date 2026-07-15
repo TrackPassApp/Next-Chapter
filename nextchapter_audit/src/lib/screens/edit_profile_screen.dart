@@ -236,7 +236,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(success ? 'Photo uploaded!' : 'Upload failed. Please try again.')),
+        SnackBar(content: Text(success
+            ? 'Photo uploaded!'
+            : (profileProvider.error ?? 'Upload failed. Please try again.'))),
       );
     }
   }
@@ -258,7 +260,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
     if (confirm != true) return;
 
-    await context.read<ProfileProvider>().deletePhoto(photoId);
+    final profileProvider = context.read<ProfileProvider>();
+    final deleted = await profileProvider.deletePhoto(photoId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(deleted
+          ? 'Photo deleted.'
+          : (profileProvider.error ?? 'Could not delete photo.')),
+    ));
+    if (deleted && mounted) {
+      await context.read<BrowseProvider>().loadProfiles();
+    }
   }
 
   Future<void> _setPrimaryPhoto(String photoId) async {
@@ -1024,4 +1036,3 @@ const _usStates = <String>[
   'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
   'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC',
 ];
-

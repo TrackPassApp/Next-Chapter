@@ -102,8 +102,17 @@ class AuthProvider extends ChangeNotifier {
     // Use client null-check (not just isConfigured) so that a failed
     // Supabase.initialize() also triggers mock mode with a visible error.
     final supabaseClient = SupabaseService.client;
-    if (supabaseClient == null) {
+    if (supabaseClient == null && AppConfig.allowMockMode) {
       _isMockMode = true;
+      _loading = false;
+      notifyListeners();
+      return;
+    }
+
+    if (supabaseClient == null) {
+      // Fail closed when production configuration is missing or invalid.
+      _user = null;
+      _isMockMode = false;
       _loading = false;
       notifyListeners();
       return;
@@ -187,7 +196,9 @@ class AuthProvider extends ChangeNotifier {
     try {
       await SupabaseService.db.auth.resetPasswordForEmail(
         email.trim(),
-        redirectTo: 'io.supabase.nextchapter://reset-password',
+        redirectTo: AppConfig.appUrl.isEmpty
+            ? null
+            : '${AppConfig.appUrl}/reset-password.html',
       );
       return const AuthResult(success: true);
     } on AuthException catch (e) {

@@ -48,12 +48,25 @@ class PhotoRepository {
         .eq('profile_id', profileId);
     final order = (existing as List).length;
 
-    await db.from('profile_photos').insert({
-      'profile_id': profileId,
-      'storage_path': storagePath,
-      'display_url': signedUrl,
-      'display_order': order,
-    });
+    try {
+      final inserted = await db.from('profile_photos').insert({
+        'profile_id': profileId,
+        'storage_path': storagePath,
+        'display_url': signedUrl,
+        'display_order': order,
+      }).select('id');
+      if ((inserted as List).isEmpty) {
+        throw StateError('Photo record insert affected 0 rows.');
+      }
+    } catch (_) {
+      // Do not leave an inaccessible orphan when the database insert fails.
+      try {
+        await db.storage.from(_bucket).remove([storagePath]);
+      } catch (cleanupError) {
+        debugPrint('uploadPhoto: orphan cleanup failed: $cleanupError');
+      }
+      rethrow;
+    }
 
     return signedUrl;
   }
@@ -153,14 +166,12 @@ class PhotoRepository {
     final list = List<Map<String, dynamic>>.from(rows as List);
     if (list.isEmpty) return;
 
-    // Reorder so the chosen id is first.
-    list.sort((a, b) {
-      if (a['id'] == photoId) return -1;
-      if (b['id'] == photoId) return 1;
-      final ao = (a['display_order'] as int?) ?? 0;
-      final bo = (b['display_order'] as int?) ?? 0;
-      return ao.compareTo(bo);
-    });
+    final targetIndex = list.indexWhere((row) => row['id'] == photoId);
+    if (targetIndex < 0) {
+      throw StateError('The selected photo was not found on this profile.');
+    }
+    final target = list.removeAt(targetIndex);
+    list.insert(0, target);
 
     debugPrint(
       'setPrimary: post-sort order for profile $profileId (target=$photoId): '
