@@ -165,18 +165,24 @@ class PhotoRepository {
       throw StateError('Supabase did not confirm the selected main photo.');
     }
 
-    // Verify the persisted result before the UI reports success.
-    final firstRows = await db
-        .from('profile_photos')
-        .select('id')
-        .eq('profile_id', profileId)
-        .order('display_order')
-        .limit(1);
-    final first = List<Map<String, dynamic>>.from(firstRows as List);
-    if (first.isEmpty || first.first['id'] != photoId) {
-      throw StateError(
-        'The selected photo was not persisted as the main photo.',
-      );
+    // A write and the immediately following read can reach different
+    // Supabase/PostgREST instances. Retry briefly so replication latency does
+    // not produce a false failure after the RPC has already committed.
+    for (var attempt = 0; attempt < 5; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      }
+      final firstRows = await db
+          .from('profile_photos')
+          .select('id')
+          .eq('profile_id', profileId)
+          .order('display_order')
+          .limit(1);
+      final first = List<Map<String, dynamic>>.from(firstRows as List);
+      if (first.isNotEmpty && first.first['id']?.toString() == photoId) {
+        return;
+      }
     }
+    throw StateError('The selected photo could not be confirmed as main.');
   }
 }

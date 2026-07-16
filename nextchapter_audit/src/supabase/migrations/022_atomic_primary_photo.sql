@@ -1,6 +1,6 @@
 -- 022 — Promote a profile photo atomically.
--- Replaces multiple client-side UPDATE requests that could leave transient
--- duplicate order values and produce cycling/off-by-one results.
+-- Replaces multiple client-side UPDATE requests that produced cycling and
+-- off-by-one results. Ownership is checked before any row is changed.
 
 begin;
 
@@ -13,37 +13,35 @@ security definer
 set search_path = public
 as $$
 declare
-  target_profile_id uuid;
+  v_profile_id uuid;
+  v_target_order integer;
+  v_updated_rows integer;
 begin
-  select pp.profile_id
-    into target_profile_id
+  select pp.profile_id, pp.display_order
+    into v_profile_id, v_target_order
     from public.profile_photos pp
     join public.profiles p on p.id = pp.profile_id
    where pp.id = target_photo_id
      and p.user_id = auth.uid();
 
-  if target_profile_id is null then
+  if v_profile_id is null then
     raise exception 'Photo not found or not owned by the signed-in user.'
       using errcode = '42501';
   end if;
 
-  with ranked as (
-    select
-      pp.id,
-      (row_number() over (
-        order by
-          case when pp.id = target_photo_id then 0 else 1 end,
-          pp.display_order,
-          pp.created_at,
-          pp.id
-      ) - 1)::integer as new_order
-    from public.profile_photos pp
-    where pp.profile_id = target_profile_id
-  )
-  update public.profile_photos pp
-     set display_order = ranked.new_order
-    from ranked
-   where pp.id = ranked.id;
+  update public.profile_photos
+     set display_order =
+       case
+         when id = target_photo_id then 0
+         when display_order < v_target_order then display_order + 1
+         else display_order
+       end
+   where profile_id = v_profile_id;
+
+  get diagnostics v_updated_rows = row_count;
+  if v_updated_rows = 0 then
+    raise exception 'No profile photos were updated.';
+  end if;
 
   return target_photo_id;
 end;
