@@ -963,77 +963,89 @@ class _PhotoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-          child: Image.network(
-            url,
-            key: ValueKey<String>('photo-image-$photoId-$url'),
+    return SizedBox(
+      width: 100,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
             width: 100,
             height: 100,
-            fit: BoxFit.cover,
-            gaplessPlayback: false,
-            errorBuilder: (_, __, ___) => Container(
-              width: 100,
-              height: 100,
-              color: colors.surfaceContainerLow,
-              child: Icon(Icons.broken_image_outlined, color: appColors.subtleText),
-            ),
-          ),
-        ),
-        if (isPrimary)
-          Positioned(
-            left: 4,
-            bottom: 4,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: colors.primary,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: const Text('MAIN',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.6,
-                  )),
-            ),
-          ),
-        if (!isPrimary && onSetPrimary != null)
-          Positioned(
-            left: 4,
-            bottom: 4,
-            child: GestureDetector(
-              onTap: () => onSetPrimary?.call(photoId),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.55),
-                  borderRadius: BorderRadius.circular(999),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                  child: Image.network(
+                    url,
+                    key: ValueKey<String>('photo-image-$photoId-$url'),
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.cover,
+                    gaplessPlayback: false,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 100,
+                      height: 100,
+                      color: colors.surfaceContainerLow,
+                      child: Icon(Icons.broken_image_outlined, color: appColors.subtleText),
+                    ),
+                  ),
                 ),
-                child: const Text('Set as main',
-                    style: TextStyle(color: Colors.white, fontSize: 10)),
-              ),
+                if (isPrimary)
+                  Positioned(
+                    left: 4,
+                    bottom: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: colors.primary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text('MAIN',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                          )),
+                    ),
+                  ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: () => onDelete(photoId),
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: appColors.danger,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close, size: 14, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        Positioned(
-          top: 4,
-          right: 4,
-          child: GestureDetector(
-            onTap: () => onDelete(photoId),
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: appColors.danger,
-                shape: BoxShape.circle,
+          const SizedBox(height: 4),
+          if (!isPrimary && onSetPrimary != null)
+            SizedBox(
+              width: 100,
+              height: 30,
+              child: TextButton(
+                key: ValueKey<String>('set-main-$photoId'),
+                onPressed: () => onSetPrimary?.call(photoId),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('Set as main', style: TextStyle(fontSize: 10)),
               ),
-              child: const Icon(Icons.close, size: 14, color: Colors.white),
-            ),
-          ),
-        ),
-      ],
+            )
+          else
+            const SizedBox(height: 30),
+        ],
+      ),
     );
   }
 }
