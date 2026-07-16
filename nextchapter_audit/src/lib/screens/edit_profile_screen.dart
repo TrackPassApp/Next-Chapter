@@ -903,10 +903,12 @@ class _PhotoGrid extends StatelessWidget {
           final photoId = record['id'] as String;
           final url = record['display_url'] as String;
           return _PhotoTile(
+            key: ValueKey(photoId),
+            photoId: photoId,
             url: url,
             isPrimary: index == 0,
-            onDelete: () => onDelete(photoId),
-            onSetPrimary: index == 0 ? null : () => onSetPrimary(photoId),
+            onDelete: onDelete,
+            onSetPrimary: index == 0 ? null : onSetPrimary,
             colors: colors,
             appColors: appColors,
           );
@@ -939,14 +941,17 @@ class _PhotoGrid extends StatelessWidget {
 }
 
 class _PhotoTile extends StatelessWidget {
+  final String photoId;
   final String url;
   final bool isPrimary;
-  final VoidCallback onDelete;
-  final VoidCallback? onSetPrimary;
+  final ValueChanged<String> onDelete;
+  final ValueChanged<String>? onSetPrimary;
   final ColorScheme colors;
   final AppColorsExtension appColors;
 
   const _PhotoTile({
+    super.key,
+    required this.photoId,
     required this.url,
     required this.isPrimary,
     required this.onDelete,
@@ -998,7 +1003,7 @@ class _PhotoTile extends StatelessWidget {
             left: 4,
             bottom: 4,
             child: GestureDetector(
-              onTap: onSetPrimary,
+              onTap: () => onSetPrimary?.call(photoId),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -1014,7 +1019,7 @@ class _PhotoTile extends StatelessWidget {
           top: 4,
           right: 4,
           child: GestureDetector(
-            onTap: onDelete,
+            onTap: () => onDelete(photoId),
             child: Container(
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
