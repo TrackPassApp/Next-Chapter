@@ -287,16 +287,27 @@ class ProfileProvider extends ChangeNotifier {
       await PhotoRepository.instance
           .setPrimary(profileId: _profileId!, photoId: photoId);
 
-      // Re-fetch the ENTIRE profile so photoUrls (and everything else read
-      // by ProfileDetail / MyProfile / Browse card) is rebuilt from
-      // display_order-ordered rows on the server. This is the authoritative
-      // refresh — mutating photoUrls in place isn't enough because the
-      // profile row is the source of truth for Browse cards too.
-      final fresh =
-          await ProfileRepository.instance.fetchProfileById(_profileId!);
-      if (fresh != null) _profile = fresh;
-      _photoRecords =
-          await PhotoRepository.instance.fetchPhotos(_profileId!);
+      // The RPC has already committed the authoritative database order.
+      // Reorder local state from the exact clicked ID instead of immediately
+      // replacing it with a potentially stale follow-up read.
+      final selectedIndex =
+          _photoRecords.indexWhere((record) => record['id'] == photoId);
+      if (selectedIndex < 0) {
+        throw StateError('The selected photo is missing from local state.');
+      }
+      final reordered = _photoRecords
+          .map((record) => Map<String, dynamic>.from(record))
+          .toList();
+      final selected = reordered.removeAt(selectedIndex);
+      reordered.insert(0, selected);
+      for (var i = 0; i < reordered.length; i++) {
+        reordered[i]['display_order'] = i;
+      }
+      _photoRecords = reordered;
+      _profile = _profile?.copyWith(
+        photoUrls:
+            reordered.map((record) => record['display_url'] as String).toList(),
+      );
       _loading = false;
       notifyListeners();
       return true;
