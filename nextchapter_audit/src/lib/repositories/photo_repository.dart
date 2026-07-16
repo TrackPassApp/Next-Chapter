@@ -135,7 +135,10 @@ class PhotoRepository {
 
   /// Returns photo records (id, storage_path, display_url, display_order)
   /// for a given profile ordered by display_order.
-  Future<List<Map<String, dynamic>>> fetchPhotos(String profileId) async {
+  Future<List<Map<String, dynamic>>> fetchPhotos(
+    String profileId, {
+    String? primaryPhotoId,
+  }) async {
     final db = SupabaseService.client;
     if (db == null) return [];
 
@@ -146,6 +149,16 @@ class PhotoRepository {
         .order('display_order');
 
     final records = List<Map<String, dynamic>>.from(rows as List);
+
+    // Primary identity is explicit. Gallery order is only the secondary sort.
+    if (primaryPhotoId != null) {
+      records.sort((a, b) {
+        if (a['id'] == primaryPhotoId) return -1;
+        if (b['id'] == primaryPhotoId) return 1;
+        return (a['display_order'] as int)
+            .compareTo(b['display_order'] as int);
+      });
+    }
 
     // display_url is legacy denormalized data created by the original app.
     // It can become detached from the row's storage object and must not be
@@ -164,9 +177,13 @@ class PhotoRepository {
         // missing object must never fail the entire browse feed.
         debugPrint('fetchPhotos: could not sign $storagePath: $e');
       }
+      final runtimeUrl = signedUrl ?? record['display_url'].toString();
+      final separator = runtimeUrl.contains('?') ? '&' : '?';
+      final photoId = Uri.encodeQueryComponent(record['id'].toString());
       return <String, dynamic>{
         ...record,
-        'display_url': signedUrl ?? record['display_url'].toString(),
+        // Make the immutable row ID part of the renderer/cache identity.
+        'display_url': '$runtimeUrl${separator}nc_photo_id=$photoId',
       };
     }));
   }

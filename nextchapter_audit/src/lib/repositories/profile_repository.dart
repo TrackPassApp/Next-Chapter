@@ -270,7 +270,11 @@ class ProfileRepository {
     dynamic db,
   ) async {
     // Fetch related rows in parallel.
-    final photosFuture = PhotoRepository.instance.fetchPhotos(profileId);
+    final primaryPhotoId = row['primary_photo_id']?.toString();
+    final photosFuture = PhotoRepository.instance.fetchPhotos(
+      profileId,
+      primaryPhotoId: primaryPhotoId,
+    );
     final interestsFuture = db.from('profile_interests')
         .select()
         .eq('profile_id', profileId)
@@ -314,6 +318,7 @@ class ProfileRepository {
       state: row['state'] as String? ?? '',
       gender: row['gender'] as String? ?? '',
       relationshipStatus: row['relationship_status'] as String? ?? '',
+      primaryPhotoId: primaryPhotoId,
       aboutMe: row['about_me'] as String? ?? '',
       // Defensive null filtering on every child-row pluck. A single NULL
       // value here (e.g. a profile_photos row with no display_url) used to

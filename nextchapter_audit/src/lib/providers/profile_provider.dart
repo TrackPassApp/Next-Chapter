@@ -47,7 +47,10 @@ class ProfileProvider extends ChangeNotifier {
       _profile = p;
       _profileId = p?.id;
       if (p != null) {
-        _photoRecords = await PhotoRepository.instance.fetchPhotos(p.id);
+        _photoRecords = await PhotoRepository.instance.fetchPhotos(
+          p.id,
+          primaryPhotoId: p.primaryPhotoId,
+        );
         _profile = p.copyWith(
           photoUrls: _photoRecords
               .map((record) => record['display_url'] as String)
@@ -221,7 +224,10 @@ class ProfileProvider extends ChangeNotifier {
 
       if (url != null) {
         // Refresh photos from DB.
-        _photoRecords = await PhotoRepository.instance.fetchPhotos(_profileId!);
+        _photoRecords = await PhotoRepository.instance.fetchPhotos(
+          _profileId!,
+          primaryPhotoId: _profile?.primaryPhotoId,
+        );
         // Update the cached profile's photoUrls list.
         _profile = _profile?.copyWith(
           photoUrls: _photoRecords.map((r) => r['display_url'] as String).toList(),
@@ -271,7 +277,10 @@ class ProfileProvider extends ChangeNotifier {
         storagePath: record['storage_path'] as String,
       );
 
-      _photoRecords = await PhotoRepository.instance.fetchPhotos(_profileId!);
+      _photoRecords = await PhotoRepository.instance.fetchPhotos(
+        _profileId!,
+        primaryPhotoId: _profile?.primaryPhotoId,
+      );
       _profile = _profile?.copyWith(
         photoUrls: _photoRecords.map((r) => r['display_url'] as String).toList(),
       );
@@ -317,6 +326,7 @@ class ProfileProvider extends ChangeNotifier {
       }
       _photoRecords = reordered;
       _profile = _profile?.copyWith(
+        primaryPhotoId: photoId,
         photoUrls:
             reordered.map((record) => record['display_url'] as String).toList(),
       );
