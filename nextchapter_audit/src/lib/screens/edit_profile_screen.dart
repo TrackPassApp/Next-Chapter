@@ -246,13 +246,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _deletePhoto(String photoId) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Photo?'),
         content: const Text('This photo will be permanently removed.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             child: Text('Delete', style: TextStyle(color: Theme.of(context).extension<AppColorsExtension>()!.danger)),
           ),
         ],
