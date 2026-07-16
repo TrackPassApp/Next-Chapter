@@ -1,5 +1,5 @@
-# Next Chapter — credential config (never commit)
-lib/config/app_config.dart
+# AppConfig contains build-time environment variable declarations only.
+# Actual values are supplied with --dart-define and are never committed.
 
 # Miscellaneous
 *.class
@@ -35,6 +35,13 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+
+# Signing credentials (all common Android/PKCS#12 formats)
+**/*.keystore
+**/*.jks
+**/*.p12
+**/*.pfx
+**/key.properties
 
 # Symbolication related
 app.*.symbols

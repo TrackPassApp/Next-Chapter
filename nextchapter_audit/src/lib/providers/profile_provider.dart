@@ -201,8 +201,9 @@ class ProfileProvider extends ChangeNotifier {
       _loading = false;
       notifyListeners();
       return url != null;
-    } catch (e) {
-      _error = 'Photo upload failed.';
+    } catch (e, st) {
+      debugPrint('uploadPhoto failed: $e\n$st');
+      _error = 'Photo upload failed: $e';
       _loading = false;
       notifyListeners();
       return false;
@@ -248,8 +249,9 @@ class ProfileProvider extends ChangeNotifier {
       _loading = false;
       notifyListeners();
       return true;
-    } catch (e) {
-      _error = 'Photo delete failed.';
+    } catch (e, st) {
+      debugPrint('deletePhoto failed: $e\n$st');
+      _error = 'Photo delete failed: $e';
       _loading = false;
       notifyListeners();
       return false;

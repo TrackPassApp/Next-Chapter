@@ -1,0 +1,57 @@
+name: Build Next Chapter Web
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'nextchapter_audit/src/**'
+      - '.github/workflows/build-flutter-web.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nextchapter_audit/src
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify required configuration
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_ANON_KEY"
+
+      - name: Analyze source
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+
+      - name: Build web release
+        run: >-
+          flutter build web --release
+          --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          --dart-define=APP_URL=https://joinmynextchapter.com
+
+      - name: Upload Cloudflare-ready artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-chapter-cloudflare
+          path: nextchapter_audit/src/build/web
+          if-no-files-found: error
+          retention-days: 14
