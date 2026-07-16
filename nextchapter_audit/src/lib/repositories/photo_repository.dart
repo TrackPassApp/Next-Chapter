@@ -141,11 +141,26 @@ class PhotoRepository {
 
     final rows = await db
         .from('profile_photos')
-        .select('id, storage_path, display_url, display_order')
+        .select('id, storage_path, display_order')
         .eq('profile_id', profileId)
         .order('display_order');
 
-    return List<Map<String, dynamic>>.from(rows as List);
+    final records = List<Map<String, dynamic>>.from(rows as List);
+
+    // display_url is legacy denormalized data created by the original app.
+    // It can become detached from the row's storage object and must not be
+    // treated as the photo identity. Build every runtime URL from the same
+    // row's immutable storage_path instead.
+    return Future.wait(records.map((record) async {
+      final storagePath = record['storage_path'] as String;
+      final signedUrl = await db.storage
+          .from(_bucket)
+          .createSignedUrl(storagePath, 60 * 60);
+      return <String, dynamic>{
+        ...record,
+        'display_url': signedUrl,
+      };
+    }));
   }
 
   /// Promote the given photo to the primary slot (display_order = 0).

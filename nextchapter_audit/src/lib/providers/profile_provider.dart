@@ -48,6 +48,11 @@ class ProfileProvider extends ChangeNotifier {
       _profileId = p?.id;
       if (p != null) {
         _photoRecords = await PhotoRepository.instance.fetchPhotos(p.id);
+        _profile = p.copyWith(
+          photoUrls: _photoRecords
+              .map((record) => record['display_url'] as String)
+              .toList(),
+        );
       }
     } catch (e) {
       _error = 'Failed to load profile.';
