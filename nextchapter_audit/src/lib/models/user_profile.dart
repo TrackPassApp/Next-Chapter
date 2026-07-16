@@ -13,6 +13,7 @@ class UserProfile {
   final String state;
   final String gender;
   final String relationshipStatus;
+  final String? primaryPhotoId;
   final List<String> photoUrls;
   final String aboutMe;
   final List<String> lookingFor;
@@ -38,6 +39,7 @@ class UserProfile {
     required this.state,
     required this.gender,
     required this.relationshipStatus,
+    this.primaryPhotoId,
     required this.photoUrls,
     required this.aboutMe,
     required this.lookingFor,
@@ -83,6 +85,7 @@ class UserProfile {
     String? state,
     String? gender,
     String? relationshipStatus,
+    String? primaryPhotoId,
     List<String>? photoUrls,
     String? aboutMe,
     List<String>? lookingFor,
@@ -108,6 +111,7 @@ class UserProfile {
       state: state ?? this.state,
       gender: gender ?? this.gender,
       relationshipStatus: relationshipStatus ?? this.relationshipStatus,
+      primaryPhotoId: primaryPhotoId ?? this.primaryPhotoId,
       photoUrls: photoUrls ?? this.photoUrls,
       aboutMe: aboutMe ?? this.aboutMe,
       lookingFor: lookingFor ?? this.lookingFor,
