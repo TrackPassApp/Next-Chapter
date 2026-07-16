@@ -157,51 +157,26 @@ class PhotoRepository {
     final db = SupabaseService.client;
     if (db == null) return;
 
-    final rows = await db
-        .from('profile_photos')
-        .select('id, display_order')
-        .eq('profile_id', profileId)
-        .order('display_order');
-
-    final list = List<Map<String, dynamic>>.from(rows as List);
-    if (list.isEmpty) return;
-
-    final targetIndex = list.indexWhere((row) => row['id'] == photoId);
-    if (targetIndex < 0) {
-      throw StateError('The selected photo was not found on this profile.');
-    }
-    final target = list.removeAt(targetIndex);
-    list.insert(0, target);
-
-    debugPrint(
-      'setPrimary: post-sort order for profile $profileId (target=$photoId): '
-      '${list.map((r) => r['id']).toList()}',
+    final selectedId = await db.rpc(
+      'set_primary_profile_photo',
+      params: {'target_photo_id': photoId},
     );
+    if (selectedId?.toString() != photoId) {
+      throw StateError('Supabase did not confirm the selected main photo.');
+    }
 
-    // Apply the new display_order values.
-    //
-    // We attach `.select('id')` so PostgREST returns the affected rows. If
-    // RLS silently rejects the update (0 rows affected) the operation would
-    // otherwise appear to succeed while leaving the DB unchanged — which is
-    // the exact failure mode we're guarding against here. Any empty result
-    // is escalated so the caller can surface it.
-    for (var i = 0; i < list.length; i++) {
-      final rows = await db
-          .from('profile_photos')
-          .update({'display_order': i})
-          .eq('id', list[i]['id'] as String)
-          .select('id');
-      final rowsList = (rows as List);
-      debugPrint(
-        'setPrimary: photo ${list[i]['id']} -> display_order=$i, '
-        'affected ${rowsList.length} row(s)',
+    // Verify the persisted result before the UI reports success.
+    final firstRows = await db
+        .from('profile_photos')
+        .select('id')
+        .eq('profile_id', profileId)
+        .order('display_order')
+        .limit(1);
+    final first = List<Map<String, dynamic>>.from(firstRows as List);
+    if (first.isEmpty || first.first['id'] != photoId) {
+      throw StateError(
+        'The selected photo was not persisted as the main photo.',
       );
-      if (rowsList.isEmpty) {
-        throw StateError(
-          'setPrimary: display_order update affected 0 rows for photo '
-          '${list[i]['id']} (profile $profileId). Likely an RLS/match issue.',
-        );
-      }
     }
   }
 }
