@@ -141,7 +141,7 @@ class PhotoRepository {
 
     final rows = await db
         .from('profile_photos')
-        .select('id, storage_path, display_order')
+        .select('id, storage_path, display_url, display_order')
         .eq('profile_id', profileId)
         .order('display_order');
 
@@ -153,12 +153,20 @@ class PhotoRepository {
     // row's immutable storage_path instead.
     return Future.wait(records.map((record) async {
       final storagePath = record['storage_path'] as String;
-      final signedUrl = await db.storage
-          .from(_bucket)
-          .createSignedUrl(storagePath, 60 * 60);
+      String? signedUrl;
+      try {
+        signedUrl = await db.storage
+            .from(_bucket)
+            .createSignedUrl(storagePath, 60 * 60);
+      } catch (e) {
+        // Some legacy/demo rows point at objects that were never migrated to
+        // Storage. Keep those profiles loadable with their existing URL; one
+        // missing object must never fail the entire browse feed.
+        debugPrint('fetchPhotos: could not sign $storagePath: $e');
+      }
       return <String, dynamic>{
         ...record,
-        'display_url': signedUrl,
+        'display_url': signedUrl ?? record['display_url'].toString(),
       };
     }));
   }
