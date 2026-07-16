@@ -147,10 +147,17 @@ class ProfileProvider extends ChangeNotifier {
         ProfileRepository.instance.ensureVerificationStatus(id, emailVerified: isEmailVerified),
       ]);
 
-      // Reload the full assembled profile so the UI reflects what's in the DB.
+      // Reload non-photo profile fields. Photo ordering is managed by the
+      // dedicated atomic photo RPC and must not be replaced by a stale read
+      // when the user saves unrelated profile fields.
       final updated = await ProfileRepository.instance.fetchMyProfile(userId);
-      _profile = updated;
-      _photoRecords = await PhotoRepository.instance.fetchPhotos(id);
+      if (updated != null) {
+        _profile = updated.copyWith(
+          photoUrls: _photoRecords
+              .map((record) => record['display_url'] as String)
+              .toList(),
+        );
+      }
 
       _loading = false;
       notifyListeners();
