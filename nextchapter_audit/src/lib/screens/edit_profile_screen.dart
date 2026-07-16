@@ -893,26 +893,27 @@ class _PhotoGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final photoTiles = List<Widget>.generate(photoRecords.length, (index) {
+      final record = photoRecords[index];
+      final photoId = record['id'] as String;
+      final url = record['display_url'] as String;
+      return _PhotoTile(
+        key: ValueKey<String>('photo-tile-$photoId'),
+        photoId: photoId,
+        url: url,
+        isPrimary: index == 0,
+        onDelete: onDelete,
+        onSetPrimary: index == 0 ? null : onSetPrimary,
+        colors: colors,
+        appColors: appColors,
+      );
+    }, growable: false);
+
     return Wrap(
       spacing: AppTheme.spacingSm,
       runSpacing: AppTheme.spacingSm,
       children: [
-        ...photoRecords.asMap().entries.map((entry) {
-          final index = entry.key;
-          final record = entry.value;
-          final photoId = record['id'] as String;
-          final url = record['display_url'] as String;
-          return _PhotoTile(
-            key: ValueKey(photoId),
-            photoId: photoId,
-            url: url,
-            isPrimary: index == 0,
-            onDelete: onDelete,
-            onSetPrimary: index == 0 ? null : onSetPrimary,
-            colors: colors,
-            appColors: appColors,
-          );
-        }),
+        ...photoTiles,
         GestureDetector(
           onTap: uploading ? null : onUpload,
           child: Container(
@@ -968,9 +969,11 @@ class _PhotoTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
           child: Image.network(
             url,
+            key: ValueKey<String>('photo-image-$photoId-$url'),
             width: 100,
             height: 100,
             fit: BoxFit.cover,
+            gaplessPlayback: false,
             errorBuilder: (_, __, ___) => Container(
               width: 100,
               height: 100,
