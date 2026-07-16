@@ -170,10 +170,28 @@ class ProfileProvider extends ChangeNotifier {
     required Uint8List bytes,
     required String mimeType,
   }) async {
-    if (SupabaseService.client == null) return false;
-    if (_profileId == null) return false;
+    if (SupabaseService.client == null) {
+      _error = 'Photo upload is unavailable because Supabase is not connected. '
+          '${SupabaseService.configurationError ?? SupabaseService.initError ?? ""}';
+      notifyListeners();
+      return false;
+    }
+
+    // A restored browser session can reach Edit Profile before ProfileProvider
+    // has finished loading. Resolve that race here instead of silently
+    // returning a generic upload failure.
+    if (_profileId == null) {
+      await loadProfile(userId);
+    }
+    if (_profileId == null) {
+      _error = 'Your profile could not be loaded. Save your profile once, then '
+          'try uploading the photo again.';
+      notifyListeners();
+      return false;
+    }
 
     _loading = true;
+    _error = null;
     notifyListeners();
 
     try {
