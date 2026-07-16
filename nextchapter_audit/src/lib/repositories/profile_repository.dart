@@ -1,4 +1,5 @@
 import '../models/user_profile.dart';
+import 'photo_repository.dart';
 import '../services/supabase_service.dart';
 
 /// Data-access layer for the [profiles] table and its child tables.
@@ -269,11 +270,7 @@ class ProfileRepository {
     dynamic db,
   ) async {
     // Fetch related rows in parallel.
-    final photosFuture = db.from('profile_photos')
-        .select()
-        .eq('profile_id', profileId)
-        .order('display_order')
-        .then((r) => r as List);
+    final photosFuture = PhotoRepository.instance.fetchPhotos(profileId);
     final interestsFuture = db.from('profile_interests')
         .select()
         .eq('profile_id', profileId)
